@@ -11,6 +11,8 @@ def theme_from_request(theme_request) -> Theme:
             description=a.description,
             style_keywords=tuple(a.style_keywords),
             enhanced_prompt=a.enhanced_prompt,
+            role_constant=a.role_constant,
+            reference_image_path=a.reference_image_path,
             settings=GenerationSettings(
                 generation_type=GenerationType(a.settings.generation_type),
                 width=a.settings.width,
@@ -18,6 +20,7 @@ def theme_from_request(theme_request) -> Theme:
                 duration_seconds=a.settings.duration_seconds,
                 num_outputs=a.settings.num_outputs,
             ),
+
         )
         for a in theme_request.assets
     )

@@ -5,6 +5,31 @@ const CATEGORIES = [
   "background", "background_character", "ui_element", "frame_animation",
 ];
 
+const uploadReferenceImage = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("http://localhost:8000/uploads/reference-image", {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  return data.path;
+};
+
+const importAsset = async (name, category, generationType, file) => {
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("category", category);
+  formData.append("generation_type", generationType);
+  formData.append("file", file);
+
+  const res = await fetch("http://localhost:8000/assets/import", {
+    method: "POST",
+    body: formData,
+  });
+  return res.json();
+};
+
 export default function AssetCard({
   asset, index, updateAsset, enhancePrompt, submitAsset,
   imageModels, animationModels,
@@ -97,7 +122,31 @@ export default function AssetCard({
             Enhance ✨
           </button>
         </div>
-
+            <div className="mb-2">
+                <label className="text-sm text-gray-600 block mb-1">
+                    Reference image {asset.generation_type === "animation" ? "(first frame)" : "(style guide)"}
+                </label>
+                <div className="flex gap-2 items-center">
+                 <input
+                    type="file"
+                    accept="image/*"
+                    className="text-sm"
+                    onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const path = await uploadReferenceImage(file);
+                        updateAsset(index, "reference_image_path", path);
+                        }}
+                />
+                {asset.reference_image_path && (
+                    <img
+                        src={`http://localhost:8000/${asset.reference_image_path}`}
+                        alt="reference"
+                       className="w-12 h-12 object-cover rounded border"
+                    />
+                )}
+            </div>
+        </div>
         <div className="grid grid-cols-4 gap-2 mb-2">
           <select className="border rounded p-2" value={asset.model_id}
             onChange={(e) => updateAsset(index, "model_id", e.target.value)}>
@@ -121,6 +170,30 @@ export default function AssetCard({
           onClick={() => submitAsset(index)}>
           Generate
         </button>
+
+        <div className="border-t pt-3 mb-4">
+            <label className="text-sm text-gray-600 block mb-1">
+             Or import an already-made asset (skips generation)
+            </label>
+            <input
+                type="file"
+                accept={asset.generation_type === "animation" ? "video/*,image/gif" : "image/*"}
+                className="text-sm"
+                onChange={async (e) => {
+                    const file = e.target.files[0];
+                     if (!file) return;
+                     const result = await importAsset(
+                         asset.name || "imported_asset",
+                         asset.category,
+                         asset.generation_type,
+                         file
+                        );
+                        setStatus("done");
+                        setResultPaths(result.result_paths);
+                        updateAsset(index, "jobId", result.job_id);
+                }}
+            />
+        </div>
 
         {status && (
           <div className="mb-2">

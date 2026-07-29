@@ -15,6 +15,8 @@ def theme_to_dict(theme: Theme) -> dict:
                 "description": a.description,
                 "style_keywords": list(a.style_keywords),
                 "enhanced_prompt": a.enhanced_prompt,
+                "role_constant": a.role_constant,
+                "reference_image_path": a.reference_image_path,
                 "settings": {
                     "generation_type": a.settings.generation_type.value,
                     "width": a.settings.width,
@@ -36,6 +38,8 @@ def theme_from_dict(data: dict) -> Theme:
             description=a["description"],
             style_keywords=tuple(a.get("style_keywords", [])),
             enhanced_prompt=a.get("enhanced_prompt"),
+            role_constant=a.get("role_constant"),
+            reference_image_path=a.get("reference_image_path"),
             settings=GenerationSettings(
                 generation_type=GenerationType(a["settings"]["generation_type"]),
                 width=a["settings"]["width"],

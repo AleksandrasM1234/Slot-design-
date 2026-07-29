@@ -8,9 +8,12 @@ class AssetCategory(Enum):
     LOGO = "logo"
     LOW_TIER = "low_tier"
     HIGH_TIER = "high_tier"
+    SYMBOL = "symbol"
+    HOLD_AND_WIN = "hold_and_win"
     BACKGROUND = "background"
     BACKGROUND_CHARACTER = "background_character"
     UI_ELEMENT = "ui_element"
+    ANIMATION = "animation"
     FRAME_ANIMATION = "frame_animation"
 
 
@@ -36,7 +39,8 @@ class AssetSpec:
     style_keywords: tuple[str, ...] = field(default_factory=tuple)
     settings: GenerationSettings = field(default_factory=GenerationSettings)
     enhanced_prompt: str | None = None
-
+    role_constant: str | None = None
+    reference_image_path: str | None = None
 
 @dataclass(frozen=True)
 class Theme:

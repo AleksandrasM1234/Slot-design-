@@ -1,4 +1,5 @@
 import time
+import os
 import requests
 from asset_pipeline.generation.base import (
     ImageGenerationProvider, GenerationRequest, GenerationResult
@@ -26,10 +27,39 @@ class LeonardoProvider(ImageGenerationProvider):
         return self._generate_image(request)
 
     def _generate_image(self, request: GenerationRequest) -> GenerationResult:
-        generation_id = self._submit_image(request)
+        init_image_id = None
+        if request.reference_image_path:
+            init_image_id = self._upload_reference_image(request.reference_image_path)
+
+        generation_id = self._submit_image(request, init_image_id)
         return self._poll_image_until_ready(generation_id)
 
-    def _submit_image(self, request: GenerationRequest) -> str:
+    def _upload_reference_image(self, local_path: str) -> str:
+        extension = os.path.splitext(local_path)[1].lstrip(".") or "png"
+
+        init_response = requests.post(
+            f"{self.BASE_URL}/init-image",
+            json={"extension": extension},
+            headers=self._headers,
+        )
+        init_response.raise_for_status()
+        init_data = init_response.json()["uploadInitImage"]
+
+        upload_url = init_data["url"]
+        upload_fields = init_data["fields"]
+        image_id = init_data["id"]
+
+        with open(local_path, "rb") as f:
+            upload_response = requests.post(
+                upload_url,
+                data=upload_fields,
+                files={"file": f},
+            )
+        upload_response.raise_for_status()
+
+        return image_id
+
+    def _submit_image(self, request: GenerationRequest, init_image_id: str | None) -> str:
         payload = {
             "prompt": request.prompt,
             "negative_prompt": request.negative_prompt,
@@ -38,6 +68,10 @@ class LeonardoProvider(ImageGenerationProvider):
             "height": request.height,
             "num_images": request.num_outputs,
         }
+        if init_image_id:
+            payload["init_image_id"] = init_image_id
+            payload["init_strength"] = 0.55
+
         response = requests.post(
             f"{self.BASE_URL}/generations",
             json=payload,
@@ -77,5 +111,6 @@ class LeonardoProvider(ImageGenerationProvider):
         raise NotImplementedError(
             "Leonardo's video/motion generation endpoint is not yet wired in. "
             "Once you have the endpoint and request/response shape, this method "
-            "will mirror _generate_image with the correct payload and polling logic."
+            "will mirror _generate_image with the correct payload and polling logic. "
+            "The reference_image_path on the request should be used as the first frame."
         )

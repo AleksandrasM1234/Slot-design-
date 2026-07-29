@@ -15,6 +15,8 @@ class AssetRequest(BaseModel):
     description: str
     style_keywords: list[str] = []
     enhanced_prompt: str | None = None
+    role_constant: str | None = None
+    reference_image_path: str | None = None
     settings: GenerationSettingsRequest = GenerationSettingsRequest()
 
 
@@ -45,3 +47,4 @@ class EnhancePromptRequest(BaseModel):
 
 class EnhancePromptResponse(BaseModel):
     enhanced_prompt: str
+    

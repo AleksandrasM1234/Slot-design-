@@ -13,7 +13,8 @@ class PromptBuilder(ABC):
 class LeonardoPromptBuilder(PromptBuilder):
 
     def build(self, theme: Theme, asset: AssetSpec) -> GenerationRequest:
-        prompt = asset.enhanced_prompt if asset.enhanced_prompt else self._assemble_prompt(theme, asset)
+        base = asset.enhanced_prompt if asset.enhanced_prompt else self._assemble_prompt(theme, asset)
+        prompt = f"{asset.role_constant} {base}" if asset.role_constant else base
         negative = "blurry, watermark, text, extra limbs, cropped"
 
         return GenerationRequest(
@@ -24,6 +25,7 @@ class LeonardoPromptBuilder(PromptBuilder):
             height=asset.settings.height,
             duration_seconds=asset.settings.duration_seconds,
             num_outputs=asset.settings.num_outputs,
+            reference_image_path=asset.reference_image_path,
         )
 
     @staticmethod

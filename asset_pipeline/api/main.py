@@ -1,8 +1,13 @@
 import os
+import uuid
+from fastapi import Form
+from fastapi import UploadFile, File
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from asset_pipeline.domain.job import JobStatus
+from asset_pipeline.domain.asset_blueprint import BLUEPRINT_LIBRARY
 from asset_pipeline.generation.prompt_enhancer import HuggingFacePromptEnhancer, category_needs_isolation
 from asset_pipeline.config.settings import HUGGINGFACE_API_KEY
 from asset_pipeline.api.schemas import EnhancePromptRequest, EnhancePromptResponse
@@ -35,6 +40,8 @@ app.add_middleware(
 
 os.makedirs("output", exist_ok=True)
 app.mount("/output", StaticFiles(directory="output"), name="output")
+os.makedirs("reference_images", exist_ok=True)
+app.mount("/reference_images", StaticFiles(directory="reference_images"), name="reference_images")
 
 repository = InMemoryJobRepository()
 broadcaster = JobEventBroadcaster()
@@ -126,3 +133,52 @@ def enhance_prompt(payload: EnhancePromptRequest):
         needs_isolation=category_needs_isolation(payload.category),
     )
     return EnhancePromptResponse(enhanced_prompt=enhanced)
+
+@app.get("/blueprints")
+def list_blueprints():
+    return [
+        {
+            "key": b.key,
+            "display_name": b.display_name,
+            "role_constant": b.role_constant,
+            "category": b.category.value,
+            "available_types": [t.value for t in b.available_types],
+            "default_num_outputs": b.default_num_outputs,
+            "default_duration_seconds": b.default_duration_seconds,
+        }
+        for b in BLUEPRINT_LIBRARY
+    ]
+
+@app.post("/uploads/reference-image")
+async def upload_reference_image(file: UploadFile = File(...)):
+    extension = os.path.splitext(file.filename)[1] or ".png"
+    filename = f"{uuid.uuid4()}{extension}"
+    path = f"reference_images/{filename}"
+
+    contents = await file.read()
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    return {"path": path}
+
+@app.post("/assets/import")
+async def import_asset(
+    name: str = Form(...),
+    category: str = Form(...),
+    generation_type: str = Form("image"),
+    file: UploadFile = File(...),
+):
+    extension = os.path.splitext(file.filename)[1] or ".png"
+    filename = f"{uuid.uuid4()}{extension}"
+    path = f"output/{filename}"
+
+    contents = await file.read()
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    job = AssetJob(asset_name=name, theme_name="imported")
+    job.status = JobStatus.DONE
+    job.result_paths = [path]
+    repository.save(job)
+
+    return {"job_id": job.id, "result_paths": job.result_paths}

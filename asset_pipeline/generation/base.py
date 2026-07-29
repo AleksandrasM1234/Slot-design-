@@ -12,6 +12,7 @@ class GenerationRequest:
     negative_prompt: str | None = None
     duration_seconds: float | None = None
     num_outputs: int = 1
+    reference_image_path: str | None = None
 
 
 @dataclass(frozen=True)

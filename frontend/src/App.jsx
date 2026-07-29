@@ -14,21 +14,28 @@ const emptyAsset = {
   duration_seconds: 4,
   num_outputs: 1,
   jobId: null,
+  role_constant: null,
+  blueprintKey: null,
+  reference_image_path: null,
 };
 
 export default function App() {
   const [gameName, setGameName] = useState("");
   const [artStyle, setArtStyle] = useState("");
   const [palette, setPalette] = useState("");
-  const [assets, setAssets] = useState([{ ...emptyAsset }]);
+  const [assets, setAssets] = useState([]);
   const [savedThemeNames, setSavedThemeNames] = useState([]);
   const [selectedThemeName, setSelectedThemeName] = useState("");
   const [imageModels, setImageModels] = useState([]);
   const [animationModels, setAnimationModels] = useState([]);
+  const [activeTab, setActiveTab] = useState("image");
+  const [blueprints, setBlueprints] = useState([]);
+  const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
     refreshThemeList();
     refreshModelList();
+    refreshBlueprints();
   }, []);
 
   const refreshModelList = async () => {
@@ -38,13 +45,36 @@ export default function App() {
     setAnimationModels(data.animation);
   };
 
+  const refreshBlueprints = async () => {
+    const res = await fetch("http://localhost:8000/blueprints");
+    setBlueprints(await res.json());
+  };
+
   const updateAsset = (index, field, value) => {
     setAssets((prev) =>
       prev.map((a, i) => (i === index ? { ...a, [field]: value } : a))
     );
   };
 
-  const addAssetRow = () => setAssets((prev) => [...prev, { ...emptyAsset }]);
+  const addAssetFromBlueprint = (blueprint, generationType) => {
+    const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
+    setAssets((prev) => [
+      ...prev,
+      {
+        ...emptyAsset,
+        name: existingCount > 0 ? `${blueprint.key}_${existingCount + 1}` : blueprint.key,
+        category: blueprint.category,
+        generation_type: generationType,
+        role_constant: blueprint.role_constant,
+        blueprintKey: blueprint.key,
+        num_outputs: blueprint.default_num_outputs,
+        duration_seconds: blueprint.default_duration_seconds ?? 4,
+      },
+    ]);
+  
+    setShowPicker(false);
+    setActiveTab(generationType);
+  };
 
   const buildThemePayload = () => ({
     name: gameName,
@@ -55,7 +85,9 @@ export default function App() {
       category: a.category,
       description: a.description,
       enhanced_prompt: a.enhanced_prompt || null,
+      role_constant: a.role_constant || null,
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
+      reference_image_path: a.reference_image_path || null,
       settings: {
         generation_type: a.generation_type,
         width: Number(a.width),
@@ -93,6 +125,8 @@ export default function App() {
         category: a.category,
         description: a.description,
         enhanced_prompt: a.enhanced_prompt || "",
+        role_constant: a.role_constant || null,
+        blueprintKey: null,
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
         model_id: "",
@@ -101,6 +135,7 @@ export default function App() {
         duration_seconds: a.settings.duration_seconds ?? 4,
         num_outputs: a.settings.num_outputs,
         jobId: null,
+        reference_image_path: a.reference_image_path || null,
       }))
     );
   };
@@ -139,6 +174,10 @@ export default function App() {
     updateAsset(index, "jobId", data.job_id);
   };
 
+  const visibleAssets = assets
+    .map((asset, originalIndex) => ({ asset, originalIndex }))
+    .filter(({ asset }) => asset.generation_type === activeTab);
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
@@ -169,17 +208,81 @@ export default function App() {
         <button className="border rounded p-2 bg-gray-200" onClick={saveTheme}>
           Save current theme
         </button>
-        <button className="border rounded p-2 bg-gray-200" onClick={addAssetRow}>
-          + Add asset
+      </div>
+
+      <div className="flex gap-1 mb-4 border-b">
+        <button
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "image"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+          }`}
+          onClick={() => setActiveTab("image")}
+        >
+          Images ({assets.filter((a) => a.generation_type === "image").length})
+        </button>
+        <button
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "animation"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+          }`}
+          onClick={() => setActiveTab("animation")}
+        >
+          Animations ({assets.filter((a) => a.generation_type === "animation").length})
         </button>
       </div>
 
+      <div className="mb-4">
+        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowPicker(true)}>
+          + Add block
+        </button>
+      </div>
+
+      {showPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowPicker(false)}>
+          <div className="bg-white rounded-lg p-6 w-[60vw] max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Choose a block</h3>
+              <button className="text-gray-500" onClick={() => setShowPicker(false)}>✕</button>
+            </div>
+           <div className="grid grid-cols-3 gap-2">
+  {blueprints.map((b) => (
+    <div key={b.key} className="border rounded p-3">
+      <div className="font-semibold mb-2">{b.display_name}</div>
+      <div className="flex gap-2">
+        {b.available_types.includes("image") && (
+          <button
+            className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+            onClick={() => addAssetFromBlueprint(b, "image")}
+          >
+            + Image
+          </button>
+        )}
+        {b.available_types.includes("animation") && (
+          <button
+            className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+            onClick={() => addAssetFromBlueprint(b, "animation")}
+          >
+            + Animation
+          </button>
+        )}
+      </div>
+    </div>
+  ))}
+</div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-6 gap-3">
-        {assets.map((asset, i) => (
+        {visibleAssets.map(({ asset, originalIndex }) => (
           <AssetCard
-            key={i}
+            key={originalIndex}
             asset={asset}
-            index={i}
+            index={originalIndex}
             updateAsset={updateAsset}
             enhancePrompt={enhancePrompt}
             submitAsset={submitAsset}
@@ -188,6 +291,12 @@ export default function App() {
           />
         ))}
       </div>
+
+      {visibleAssets.length === 0 && (
+        <div className="text-gray-400 text-sm mt-8 text-center">
+          No {activeTab === "image" ? "image" : "animation"} assets yet — click "+ Add block" above.
+        </div>
+      )}
     </div>
   );
 }
