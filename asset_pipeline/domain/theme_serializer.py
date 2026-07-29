@@ -14,6 +14,7 @@ def theme_to_dict(theme: Theme) -> dict:
                 "category": a.category.value,
                 "description": a.description,
                 "style_keywords": list(a.style_keywords),
+                "enhanced_prompt": a.enhanced_prompt,
                 "settings": {
                     "generation_type": a.settings.generation_type.value,
                     "width": a.settings.width,
@@ -34,6 +35,7 @@ def theme_from_dict(data: dict) -> Theme:
             category=AssetCategory(a["category"]),
             description=a["description"],
             style_keywords=tuple(a.get("style_keywords", [])),
+            enhanced_prompt=a.get("enhanced_prompt"),
             settings=GenerationSettings(
                 generation_type=GenerationType(a["settings"]["generation_type"]),
                 width=a["settings"]["width"],

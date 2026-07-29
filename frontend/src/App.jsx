@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import AssetWindow from "./AssetWindow";
+import AssetCard from "./AssetCard";
 
 const emptyAsset = {
   name: "",
   category: "symbol",
   description: "",
+  enhanced_prompt: "",
   style_keywords: "",
   generation_type: "image",
   model_id: "",
@@ -12,19 +13,14 @@ const emptyAsset = {
   height: 768,
   duration_seconds: 4,
   num_outputs: 1,
+  jobId: null,
 };
-
-const CATEGORIES = [
-  "wild", "scatter", "logo", "low_tier", "high_tier",
-  "background", "background_character", "ui_element", "frame_animation",
-];
 
 export default function App() {
   const [gameName, setGameName] = useState("");
   const [artStyle, setArtStyle] = useState("");
   const [palette, setPalette] = useState("");
   const [assets, setAssets] = useState([{ ...emptyAsset }]);
-  const [assetIds, setAssetIds] = useState([]);
   const [savedThemeNames, setSavedThemeNames] = useState([]);
   const [selectedThemeName, setSelectedThemeName] = useState("");
   const [imageModels, setImageModels] = useState([]);
@@ -58,6 +54,7 @@ export default function App() {
       name: a.name,
       category: a.category,
       description: a.description,
+      enhanced_prompt: a.enhanced_prompt || null,
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
         generation_type: a.generation_type,
@@ -95,6 +92,7 @@ export default function App() {
         name: a.name,
         category: a.category,
         description: a.description,
+        enhanced_prompt: a.enhanced_prompt || "",
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
         model_id: "",
@@ -102,11 +100,30 @@ export default function App() {
         height: a.settings.height,
         duration_seconds: a.settings.duration_seconds ?? 4,
         num_outputs: a.settings.num_outputs,
+        jobId: null,
       }))
     );
   };
 
-  const submitAsset = async (assetForm) => {
+  const enhancePrompt = async (index) => {
+    const asset = assets[index];
+    const res = await fetch("http://localhost:8000/prompts/enhance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_prompt: asset.description,
+        art_style: artStyle,
+        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+        category: asset.category,
+        is_animation: asset.generation_type === "animation",
+      }),
+    });
+    const data = await res.json();
+    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+  };
+
+  const submitAsset = async (index) => {
+    const assetForm = assets[index];
     const theme = buildThemePayload();
 
     const res = await fetch("http://localhost:8000/assets", {
@@ -119,7 +136,7 @@ export default function App() {
       }),
     });
     const data = await res.json();
-    setAssetIds((prev) => [...prev, data.job_id]);
+    updateAsset(index, "jobId", data.job_id);
   };
 
   return (
@@ -152,76 +169,23 @@ export default function App() {
         <button className="border rounded p-2 bg-gray-200" onClick={saveTheme}>
           Save current theme
         </button>
+        <button className="border rounded p-2 bg-gray-200" onClick={addAssetRow}>
+          + Add asset
+        </button>
       </div>
 
-      <h2 className="font-semibold mb-2">Assets</h2>
-      {assets.map((a, i) => {
-        const modelOptions = a.generation_type === "animation" ? animationModels : imageModels;
-        return (
-          <div key={i} className="border rounded p-3 mb-3 bg-gray-50">
-            <div className="grid grid-cols-4 gap-2 mb-2">
-              <input className="border rounded p-2" placeholder="Name"
-                value={a.name} onChange={(e) => updateAsset(i, "name", e.target.value)} />
-              <select className="border rounded p-2" value={a.category}
-                onChange={(e) => updateAsset(i, "category", e.target.value)}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select className="border rounded p-2" value={a.generation_type}
-                onChange={(e) => {
-                  updateAsset(i, "generation_type", e.target.value);
-                  updateAsset(i, "model_id", "");
-                }}>
-                <option value="image">image</option>
-                <option value="animation">animation</option>
-              </select>
-              <input className="border rounded p-2" type="number" min="1" max="8"
-                placeholder="Number of generations" value={a.num_outputs}
-                onChange={(e) => updateAsset(i, "num_outputs", e.target.value)} />
-            </div>
-
-            <input className="border rounded p-2 w-full mb-2" placeholder="Description"
-              value={a.description} onChange={(e) => updateAsset(i, "description", e.target.value)} />
-
-            <div className="grid grid-cols-4 gap-2">
-              <select className="border rounded p-2" value={a.model_id}
-                onChange={(e) => updateAsset(i, "model_id", e.target.value)}>
-                <option value="">— Select model —</option>
-                {modelOptions.map((m) => (
-                  <option key={m.model_id} value={m.model_id}>{m.name}</option>
-                ))}
-              </select>
-              <input className="border rounded p-2" type="number" placeholder="Width"
-                value={a.width} onChange={(e) => updateAsset(i, "width", e.target.value)} />
-              <input className="border rounded p-2" type="number" placeholder="Height"
-                value={a.height} onChange={(e) => updateAsset(i, "height", e.target.value)} />
-              {a.generation_type === "animation" ? (
-                <input className="border rounded p-2" type="number" step="0.5"
-                  placeholder="Duration (sec)" value={a.duration_seconds}
-                  onChange={(e) => updateAsset(i, "duration_seconds", e.target.value)} />
-              ) : (
-                <button className="border rounded p-2 bg-blue-500 text-white"
-                  onClick={() => submitAsset(a)}>
-                  Generate
-                </button>
-              )}
-            </div>
-            {a.generation_type === "animation" && (
-              <button className="border rounded p-2 bg-blue-500 text-white w-full mt-2"
-                onClick={() => submitAsset(a)}>
-                Generate
-              </button>
-            )}
-          </div>
-        );
-      })}
-      <button className="text-sm text-blue-600 mb-6" onClick={addAssetRow}>
-        + Add another asset
-      </button>
-
-      <h2 className="font-semibold mb-2">Generated assets</h2>
-      <div className="grid grid-cols-3 gap-4">
-        {assetIds.map((id) => (
-          <AssetWindow key={id} jobId={id} />
+      <div className="grid grid-cols-6 gap-3">
+        {assets.map((asset, i) => (
+          <AssetCard
+            key={i}
+            asset={asset}
+            index={i}
+            updateAsset={updateAsset}
+            enhancePrompt={enhancePrompt}
+            submitAsset={submitAsset}
+            imageModels={imageModels}
+            animationModels={animationModels}
+          />
         ))}
       </div>
     </div>

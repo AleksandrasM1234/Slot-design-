@@ -14,6 +14,7 @@ class AssetRequest(BaseModel):
     category: str
     description: str
     style_keywords: list[str] = []
+    enhanced_prompt: str | None = None
     settings: GenerationSettingsRequest = GenerationSettingsRequest()
 
 
@@ -32,3 +33,15 @@ class CreateAssetRequest(BaseModel):
 
 class SaveThemeRequest(BaseModel):
     theme: ThemeRequest
+
+
+class EnhancePromptRequest(BaseModel):
+    base_prompt: str
+    art_style: str
+    palette: list[str]
+    category: str
+    is_animation: bool = False
+
+
+class EnhancePromptResponse(BaseModel):
+    enhanced_prompt: str

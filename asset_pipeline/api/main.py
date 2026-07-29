@@ -3,6 +3,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from asset_pipeline.generation.prompt_enhancer import HuggingFacePromptEnhancer, category_needs_isolation
+from asset_pipeline.config.settings import HUGGINGFACE_API_KEY
+from asset_pipeline.api.schemas import EnhancePromptRequest, EnhancePromptResponse
 from asset_pipeline.api.schemas import CreateAssetRequest, SaveThemeRequest
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
@@ -111,3 +114,15 @@ async def asset_updates(websocket: WebSocket, job_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         broadcaster.unsubscribe(job_id, websocket)
+
+@app.post("/prompts/enhance", response_model=EnhancePromptResponse)
+def enhance_prompt(payload: EnhancePromptRequest):
+    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhanced = enhancer.enhance(
+        payload.base_prompt,
+        payload.art_style,
+        payload.palette,
+        is_animation=payload.is_animation,
+        needs_isolation=category_needs_isolation(payload.category),
+    )
+    return EnhancePromptResponse(enhanced_prompt=enhanced)

@@ -10,6 +10,7 @@ def theme_from_request(theme_request) -> Theme:
             category=AssetCategory(a.category),
             description=a.description,
             style_keywords=tuple(a.style_keywords),
+            enhanced_prompt=a.enhanced_prompt,
             settings=GenerationSettings(
                 generation_type=GenerationType(a.settings.generation_type),
                 width=a.settings.width,

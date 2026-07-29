@@ -35,6 +35,7 @@ class AssetSpec:
     description: str
     style_keywords: tuple[str, ...] = field(default_factory=tuple)
     settings: GenerationSettings = field(default_factory=GenerationSettings)
+    enhanced_prompt: str | None = None
 
 
 @dataclass(frozen=True)
