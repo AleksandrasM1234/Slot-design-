@@ -31,11 +31,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("image");
   const [blueprints, setBlueprints] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [frameworks, setFrameworks] = useState([]);
+  const [showFrameworkPicker, setShowFrameworkPicker] = useState(false);
+  const [showCreateFramework, setShowCreateFramework] = useState(false);
+  const [newFrameworkName, setNewFrameworkName] = useState("");
+  const [newFrameworkDescription, setNewFrameworkDescription] = useState("");
+  const [newFrameworkCounts, setNewFrameworkCounts] = useState({});
 
   useEffect(() => {
     refreshThemeList();
     refreshModelList();
     refreshBlueprints();
+    refreshFrameworks();
   }, []);
 
   const refreshModelList = async () => {
@@ -48,6 +55,11 @@ export default function App() {
   const refreshBlueprints = async () => {
     const res = await fetch("http://localhost:8000/blueprints");
     setBlueprints(await res.json());
+  };
+
+  const refreshFrameworks = async () => {
+    const res = await fetch("http://localhost:8000/frameworks");
+    setFrameworks(await res.json());
   };
 
   const updateAsset = (index, field, value) => {
@@ -71,9 +83,88 @@ export default function App() {
         duration_seconds: blueprint.default_duration_seconds ?? 4,
       },
     ]);
-  
     setShowPicker(false);
-    setActiveTab(generationType);
+  };
+
+  const loadFramework = (framework) => {
+    framework.blueprint_keys.forEach((key) => {
+      const blueprint = blueprints.find((b) => b.key === key);
+      if (!blueprint) return;
+      const defaultType = blueprint.available_types.includes("image") ? "image" : "animation";
+      addAssetFromBlueprint(blueprint, defaultType);
+    });
+    setShowFrameworkPicker(false);
+  };
+
+  const adjustFrameworkCount = (key, delta) => {
+    setNewFrameworkCounts((prev) => {
+      const next = { ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) };
+      return next;
+    });
+  };
+
+  const saveNewFramework = async () => {
+    const blueprintKeys = [];
+    Object.entries(newFrameworkCounts).forEach(([key, count]) => {
+      for (let i = 0; i < count; i++) blueprintKeys.push(key);
+    });
+    if (!newFrameworkName || blueprintKeys.length === 0) return;
+
+    const key = newFrameworkName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    await fetch("http://localhost:8000/frameworks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key,
+        display_name: newFrameworkName,
+        description: newFrameworkDescription,
+        blueprint_keys: blueprintKeys,
+      }),
+    });
+
+    setNewFrameworkName("");
+    setNewFrameworkDescription("");
+    setNewFrameworkCounts({});
+    setShowCreateFramework(false);
+    await refreshFrameworks();
+  };
+
+  const exportFramework = (framework) => {
+    const blob = new Blob([JSON.stringify(framework, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${framework.key}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const deleteFramework = async (framework) => {
+    const confirmed = window.confirm(
+     `Delete "${framework.display_name}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    await fetch(`http://localhost:8000/frameworks/${framework.key}`, {
+      method: "DELETE",
+    });
+    await refreshFrameworks();
+  };
+
+  const importFramework = async (file) => {
+    const text = await file.text();
+    const framework = JSON.parse(text);
+    await fetch("http://localhost:8000/frameworks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        key: framework.key,
+        display_name: framework.display_name,
+        description: framework.description || "",
+        blueprint_keys: framework.blueprint_keys,
+      }),
+    });
+    await refreshFrameworks();
   };
 
   const buildThemePayload = () => ({
@@ -86,8 +177,8 @@ export default function App() {
       description: a.description,
       enhanced_prompt: a.enhanced_prompt || null,
       role_constant: a.role_constant || null,
-      style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       reference_image_path: a.reference_image_path || null,
+      style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
         generation_type: a.generation_type,
         width: Number(a.width),
@@ -127,6 +218,7 @@ export default function App() {
         enhanced_prompt: a.enhanced_prompt || "",
         role_constant: a.role_constant || null,
         blueprintKey: null,
+        reference_image_path: a.reference_image_path || null,
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
         model_id: "",
@@ -135,7 +227,6 @@ export default function App() {
         duration_seconds: a.settings.duration_seconds ?? 4,
         num_outputs: a.settings.num_outputs,
         jobId: null,
-        reference_image_path: a.reference_image_path || null,
       }))
     );
   };
@@ -213,9 +304,7 @@ export default function App() {
       <div className="flex gap-1 mb-4 border-b">
         <button
           className={`px-4 py-2 font-semibold ${
-            activeTab === "image"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
+            activeTab === "image" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
           }`}
           onClick={() => setActiveTab("image")}
         >
@@ -223,9 +312,7 @@ export default function App() {
         </button>
         <button
           className={`px-4 py-2 font-semibold ${
-            activeTab === "animation"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
+            activeTab === "animation" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
           }`}
           onClick={() => setActiveTab("animation")}
         >
@@ -233,10 +320,24 @@ export default function App() {
         </button>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2 flex-wrap">
         <button className="border rounded p-2 bg-gray-200" onClick={() => setShowPicker(true)}>
           + Add block
         </button>
+        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowFrameworkPicker(true)}>
+          Load framework
+        </button>
+        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowCreateFramework(true)}>
+          + Create framework
+        </button>
+        <label className="border rounded p-2 bg-gray-200 cursor-pointer">
+          Import framework
+          <input type="file" accept="application/json" className="hidden"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) importFramework(file);
+            }} />
+        </label>
       </div>
 
       {showPicker && (
@@ -248,31 +349,104 @@ export default function App() {
               <h3 className="text-lg font-bold">Choose a block</h3>
               <button className="text-gray-500" onClick={() => setShowPicker(false)}>✕</button>
             </div>
-           <div className="grid grid-cols-3 gap-2">
-  {blueprints.map((b) => (
-    <div key={b.key} className="border rounded p-3">
-      <div className="font-semibold mb-2">{b.display_name}</div>
-      <div className="flex gap-2">
-        {b.available_types.includes("image") && (
-          <button
-            className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
-            onClick={() => addAssetFromBlueprint(b, "image")}
-          >
-            + Image
-          </button>
-        )}
-        {b.available_types.includes("animation") && (
-          <button
-            className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
-            onClick={() => addAssetFromBlueprint(b, "animation")}
-          >
-            + Animation
-          </button>
-        )}
-      </div>
-    </div>
-  ))}
-</div>
+            <div className="grid grid-cols-3 gap-2">
+              {blueprints.map((b) => (
+                <div key={b.key} className="border rounded p-3">
+                  <div className="font-semibold mb-2">{b.display_name}</div>
+                  <div className="flex gap-2">
+                    {b.available_types.includes("image") && (
+                      <button className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+                        onClick={() => addAssetFromBlueprint(b, "image")}>
+                        + Image
+                      </button>
+                    )}
+                    {b.available_types.includes("animation") && (
+                      <button className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+                        onClick={() => addAssetFromBlueprint(b, "animation")}>
+                        + Animation
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFrameworkPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowFrameworkPicker(false)}>
+          <div className="bg-white rounded-lg p-6 w-[50vw] max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Choose a framework</h3>
+              <button className="text-gray-500" onClick={() => setShowFrameworkPicker(false)}>✕</button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {frameworks.map((f) => (
+                <div key={f.key} className="border rounded p-3 flex justify-between items-start gap-2">
+                  <button className="text-left flex-1 hover:bg-gray-50 -m-1 p-1 rounded"
+                    onClick={() => loadFramework(f)}>
+                    <div className="font-semibold">{f.display_name}</div>
+                    <div className="text-sm text-gray-500">{f.description}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                    {f.blueprint_keys.length} blocks {f.is_builtin && "· built-in"}
+                    </div>
+                  </button>
+                  <div className="flex flex-col gap-1 items-end">
+                    <button className="text-sm text-blue-600 whitespace-nowrap"
+                      onClick={() => exportFramework(f)}>
+                      Export
+                    </button>
+                    {!f.is_builtin && (
+                      <button className="text-sm text-red-600 whitespace-nowrap"
+                        onClick={() => deleteFramework(f)}>
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateFramework && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowCreateFramework(false)}>
+          <div className="bg-white rounded-lg p-6 w-[60vw] max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Create a framework</h3>
+              <button className="text-gray-500" onClick={() => setShowCreateFramework(false)}>✕</button>
+            </div>
+
+            <input className="border rounded p-2 w-full mb-2" placeholder="Framework name"
+              value={newFrameworkName} onChange={(e) => setNewFrameworkName(e.target.value)} />
+            <input className="border rounded p-2 w-full mb-4" placeholder="Description"
+              value={newFrameworkDescription} onChange={(e) => setNewFrameworkDescription(e.target.value)} />
+
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {blueprints.map((b) => (
+                <div key={b.key} className="border rounded p-2 flex justify-between items-center">
+                  <span className="text-sm">{b.display_name}</span>
+                  <div className="flex items-center gap-1">
+                    <button className="border rounded w-6 h-6"
+                      onClick={() => adjustFrameworkCount(b.key, -1)}>-</button>
+                    <span className="w-4 text-center text-sm">{newFrameworkCounts[b.key] || 0}</span>
+                    <button className="border rounded w-6 h-6"
+                      onClick={() => adjustFrameworkCount(b.key, 1)}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button className="border rounded p-2 bg-blue-500 text-white w-full"
+              onClick={saveNewFramework}>
+              Save framework
+            </button>
           </div>
         </div>
       )}

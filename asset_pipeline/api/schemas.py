@@ -47,4 +47,10 @@ class EnhancePromptRequest(BaseModel):
 
 class EnhancePromptResponse(BaseModel):
     enhanced_prompt: str
-    
+
+
+class SaveFrameworkRequest(BaseModel):
+    key: str
+    display_name: str
+    description: str = ""
+    blueprint_keys: list[str]

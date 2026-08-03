@@ -1,22 +1,23 @@
 import os
 import uuid
-from fastapi import Form
-from fastapi import UploadFile, File
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
 
-from asset_pipeline.domain.job import JobStatus
-from asset_pipeline.domain.asset_blueprint import BLUEPRINT_LIBRARY
-from asset_pipeline.generation.prompt_enhancer import HuggingFacePromptEnhancer, category_needs_isolation
-from asset_pipeline.config.settings import HUGGINGFACE_API_KEY
-from asset_pipeline.api.schemas import EnhancePromptRequest, EnhancePromptResponse
-from asset_pipeline.api.schemas import CreateAssetRequest, SaveThemeRequest
+from asset_pipeline.api.schemas import (
+    CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
+    EnhancePromptResponse, SaveFrameworkRequest,
+)
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
 from asset_pipeline.domain.theme import GenerationType
+from asset_pipeline.domain.job import AssetJob, JobStatus
+from asset_pipeline.domain.asset_blueprint import BLUEPRINT_LIBRARY
+from asset_pipeline.domain.framework_preset import FrameworkPreset, FRAMEWORK_PRESETS
 from asset_pipeline.generation.factory import GenerationProviderFactory
 from asset_pipeline.generation.prompt_builder import LeonardoPromptBuilder
+from asset_pipeline.generation.prompt_enhancer import HuggingFacePromptEnhancer, category_needs_isolation
 from asset_pipeline.generation.model_catalog import models_for_type, find_model
 from asset_pipeline.postprocessing.config import PostProcessingConfig
 from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline
@@ -24,9 +25,9 @@ from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
 from asset_pipeline.orchestration.job_repository import InMemoryJobRepository
 from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 from asset_pipeline.orchestration.job_runner import AssetJobRunner
-from asset_pipeline.domain.job import AssetJob
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
-from asset_pipeline.config.settings import LEONARDO_API_KEY
+from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
+from asset_pipeline.config.settings import LEONARDO_API_KEY, HUGGINGFACE_API_KEY
 
 app = FastAPI()
 
@@ -39,24 +40,25 @@ app.add_middleware(
 )
 
 os.makedirs("output", exist_ok=True)
-app.mount("/output", StaticFiles(directory="output"), name="output")
 os.makedirs("reference_images", exist_ok=True)
+app.mount("/output", StaticFiles(directory="output"), name="output")
 app.mount("/reference_images", StaticFiles(directory="reference_images"), name="reference_images")
 
 repository = InMemoryJobRepository()
 broadcaster = JobEventBroadcaster()
 theme_repository = JsonFileThemeRepository()
+framework_repository = JsonFileFrameworkRepository()
 
 API_KEYS_BY_PROVIDER = {
     "leonardo": LEONARDO_API_KEY,
 }
 
 
-def build_pipeline(model_id: str) -> AssetGenerationPipeline:
+def build_pipeline(model_id: str, target_width: int, target_height: int) -> AssetGenerationPipeline:
     model_option = find_model(model_id)
     api_key = API_KEYS_BY_PROVIDER[model_option.provider]
     provider = GenerationProviderFactory.create(model_option.provider, api_key=api_key, model_id=model_id)
-    frame_pipeline = build_frame_pipeline(PostProcessingConfig())
+    frame_pipeline = build_frame_pipeline(PostProcessingConfig(), target_width, target_height)
     return AssetGenerationPipeline(LeonardoPromptBuilder(), provider, frame_pipeline)
 
 
@@ -68,11 +70,34 @@ async def create_asset(payload: CreateAssetRequest, background_tasks: Background
     job = AssetJob(asset_name=asset.name, theme_name=theme.name)
     repository.save(job)
 
-    pipeline = build_pipeline(payload.model_id)
+    pipeline = build_pipeline(payload.model_id, asset.settings.width, asset.settings.height)
     runner = AssetJobRunner(pipeline, repository, broadcaster)
     background_tasks.add_task(runner.run, job, theme, asset)
 
     return {"job_id": job.id}
+
+
+@app.post("/assets/import")
+async def import_asset(
+    name: str = Form(...),
+    category: str = Form(...),
+    generation_type: str = Form("image"),
+    file: UploadFile = File(...),
+):
+    extension = os.path.splitext(file.filename)[1] or ".png"
+    filename = f"{uuid.uuid4()}{extension}"
+    path = f"output/{filename}"
+
+    contents = await file.read()
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    job = AssetJob(asset_name=name, theme_name="imported")
+    job.status = JobStatus.DONE
+    job.result_paths = [path]
+    repository.save(job)
+
+    return {"job_id": job.id, "result_paths": job.result_paths}
 
 
 @app.get("/assets")
@@ -92,6 +117,76 @@ def list_models():
             for m in models_for_type(GenerationType.ANIMATION)
         ],
     }
+
+
+@app.get("/blueprints")
+def list_blueprints():
+    return [
+        {
+            "key": b.key,
+            "display_name": b.display_name,
+            "role_constant": b.role_constant,
+            "category": b.category.value,
+            "available_types": [t.value for t in b.available_types],
+            "default_num_outputs": b.default_num_outputs,
+            "default_duration_seconds": b.default_duration_seconds,
+        }
+        for b in BLUEPRINT_LIBRARY
+    ]
+
+
+@app.get("/frameworks")
+def list_frameworks():
+    builtin_keys = {p.key for p in FRAMEWORK_PRESETS}
+    all_presets = list(FRAMEWORK_PRESETS) + framework_repository.list_all()
+    return [
+        {
+            "key": p.key,
+            "display_name": p.display_name,
+            "description": p.description,
+            "blueprint_keys": list(p.blueprint_keys),
+            "is_builtin": p.key in builtin_keys,
+        }
+        for p in all_presets
+    ]
+
+
+@app.post("/frameworks")
+def save_framework(payload: SaveFrameworkRequest):
+    preset = FrameworkPreset(
+        key=payload.key,
+        display_name=payload.display_name,
+        description=payload.description,
+        blueprint_keys=tuple(payload.blueprint_keys),
+    )
+    framework_repository.save(preset)
+    return {"status": "saved", "key": preset.key}
+
+
+@app.post("/uploads/reference-image")
+async def upload_reference_image(file: UploadFile = File(...)):
+    extension = os.path.splitext(file.filename)[1] or ".png"
+    filename = f"{uuid.uuid4()}{extension}"
+    path = f"reference_images/{filename}"
+
+    contents = await file.read()
+    with open(path, "wb") as f:
+        f.write(contents)
+
+    return {"path": path}
+
+
+@app.post("/prompts/enhance", response_model=EnhancePromptResponse)
+def enhance_prompt(payload: EnhancePromptRequest):
+    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhanced = enhancer.enhance(
+        payload.base_prompt,
+        payload.art_style,
+        payload.palette,
+        is_animation=payload.is_animation,
+        needs_isolation=category_needs_isolation(payload.category),
+    )
+    return EnhancePromptResponse(enhanced_prompt=enhanced)
 
 
 @app.post("/themes")
@@ -122,63 +217,14 @@ async def asset_updates(websocket: WebSocket, job_id: str):
     except WebSocketDisconnect:
         broadcaster.unsubscribe(job_id, websocket)
 
-@app.post("/prompts/enhance", response_model=EnhancePromptResponse)
-def enhance_prompt(payload: EnhancePromptRequest):
-    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
-    enhanced = enhancer.enhance(
-        payload.base_prompt,
-        payload.art_style,
-        payload.palette,
-        is_animation=payload.is_animation,
-        needs_isolation=category_needs_isolation(payload.category),
-    )
-    return EnhancePromptResponse(enhanced_prompt=enhanced)
+@app.delete("/frameworks/{key}")
+def delete_framework(key: str):
+    is_builtin = any(p.key == key for p in FRAMEWORK_PRESETS)
+    if is_builtin:
+        raise HTTPException(status_code=400, detail="Cannot delete a built-in framework.")
 
-@app.get("/blueprints")
-def list_blueprints():
-    return [
-        {
-            "key": b.key,
-            "display_name": b.display_name,
-            "role_constant": b.role_constant,
-            "category": b.category.value,
-            "available_types": [t.value for t in b.available_types],
-            "default_num_outputs": b.default_num_outputs,
-            "default_duration_seconds": b.default_duration_seconds,
-        }
-        for b in BLUEPRINT_LIBRARY
-    ]
+    deleted = framework_repository.delete(key)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Framework not found.")
 
-@app.post("/uploads/reference-image")
-async def upload_reference_image(file: UploadFile = File(...)):
-    extension = os.path.splitext(file.filename)[1] or ".png"
-    filename = f"{uuid.uuid4()}{extension}"
-    path = f"reference_images/{filename}"
-
-    contents = await file.read()
-    with open(path, "wb") as f:
-        f.write(contents)
-
-    return {"path": path}
-
-@app.post("/assets/import")
-async def import_asset(
-    name: str = Form(...),
-    category: str = Form(...),
-    generation_type: str = Form("image"),
-    file: UploadFile = File(...),
-):
-    extension = os.path.splitext(file.filename)[1] or ".png"
-    filename = f"{uuid.uuid4()}{extension}"
-    path = f"output/{filename}"
-
-    contents = await file.read()
-    with open(path, "wb") as f:
-        f.write(contents)
-
-    job = AssetJob(asset_name=name, theme_name="imported")
-    job.status = JobStatus.DONE
-    job.result_paths = [path]
-    repository.save(job)
-
-    return {"job_id": job.id, "result_paths": job.result_paths}
+    return {"status": "deleted", "key": key}
