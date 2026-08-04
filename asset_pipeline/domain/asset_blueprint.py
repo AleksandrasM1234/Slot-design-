@@ -96,6 +96,19 @@ BLUEPRINT_LIBRARY: tuple[AssetBlueprint, ...] = (
     AssetBlueprint("hw_text_transition", "Hold & Win text transition",
         "This asset must always be a text transition animation used when entering or updating the Hold & Win feature.",
         AssetCategory.ANIMATION, ANIMATION_ONLY, default_duration_seconds=1.5),
+
+    AssetBlueprint("background_intro_landscape", "Intro background (landscape)",
+        "This asset must always be a full 16:9 landscape-orientation background scene used for the game's intro screen.",
+        AssetCategory.BACKGROUND, IMAGE_ONLY),
+    AssetBlueprint("background_intro_portrait", "Intro background (portrait)",
+        "This asset must always be a full 9:16 portrait-orientation background scene used for the game's intro screen.",
+        AssetCategory.BACKGROUND, IMAGE_ONLY),
+    AssetBlueprint("background_game_landscape", "Game background (landscape)",
+        "This asset must always be a full 16:9 landscape-orientation background scene used behind the main game reels.",
+        AssetCategory.BACKGROUND, IMAGE_ONLY),
+    AssetBlueprint("background_game_portrait", "Game background (portrait)",
+        "This asset must always be a full 9:16 portrait-orientation background scene used behind the main game reels.",
+        AssetCategory.BACKGROUND, IMAGE_ONLY),
 )
 
 

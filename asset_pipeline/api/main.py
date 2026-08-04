@@ -57,7 +57,7 @@ API_KEYS_BY_PROVIDER = {
 def build_pipeline(model_id: str, target_width: int, target_height: int) -> AssetGenerationPipeline:
     model_option = find_model(model_id)
     api_key = API_KEYS_BY_PROVIDER[model_option.provider]
-    provider = GenerationProviderFactory.create(model_option.provider, api_key=api_key, model_id=model_id)
+    provider = GenerationProviderFactory.create(model_option.provider, api_key=api_key, model=model_option)
     frame_pipeline = build_frame_pipeline(PostProcessingConfig(), target_width, target_height)
     return AssetGenerationPipeline(LeonardoPromptBuilder(), provider, frame_pipeline)
 
