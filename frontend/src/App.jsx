@@ -37,7 +37,9 @@ export default function App() {
   const [newFrameworkName, setNewFrameworkName] = useState("");
   const [newFrameworkDescription, setNewFrameworkDescription] = useState("");
   const [newFrameworkCounts, setNewFrameworkCounts] = useState({});
-
+  const [masterPrompt, setMasterPrompt] = useState("");
+  const [masterPromptEnhanced, setMasterPromptEnhanced] = useState("");
+  
   useEffect(() => {
     refreshThemeList();
     refreshModelList();
@@ -171,6 +173,8 @@ export default function App() {
     name: gameName,
     art_style: artStyle,
     palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+    master_prompt: masterPrompt,
+    master_prompt_enhanced: masterPromptEnhanced || null,
     assets: assets.map((a) => ({
       name: a.name,
       category: a.category,
@@ -210,6 +214,8 @@ export default function App() {
     setGameName(theme.name);
     setArtStyle(theme.art_style);
     setPalette(theme.palette.join(", "));
+    setMasterPrompt(theme.master_prompt || "");
+    setMasterPromptEnhanced(theme.master_prompt_enhanced || "");
     setAssets(
       theme.assets.map((a) => ({
         name: a.name,
@@ -242,12 +248,54 @@ export default function App() {
         palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
         category: asset.category,
         is_animation: asset.generation_type === "animation",
+        master_context: masterPromptEnhanced || masterPrompt || null,
+      }),
+   });
+   const data = await res.json();
+   updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+  };
+
+  const enhanceMasterPrompt = async () => {
+    const res = await fetch("http://localhost:8000/prompts/enhance-master", {
+     method: "POST",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({
+       base_prompt: masterPrompt,
+        art_style: artStyle,
+        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+     }),
+    });
+    const data = await res.json();
+    setMasterPromptEnhanced(data.enhanced_prompt);
+  };
+    const autoFillFromWorld = async () => {
+  const context = masterPromptEnhanced || masterPrompt;
+  if (!context) return;
+
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    if (asset.description.trim() !== "") continue;
+
+    const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
+    const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+
+    const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role_display_name: roleName,
+        category: asset.category,
+        is_animation: asset.generation_type === "animation",
+        art_style: artStyle,
+        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+        master_context: context,
       }),
     });
     const data = await res.json();
-    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
-  };
-
+    updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
+    updateAsset(i, "description", `(auto-filled from world) ${roleName}`);
+  }
+};
   const submitAsset = async (index) => {
     const assetForm = assets[index];
     const theme = buildThemePayload();
@@ -269,8 +317,8 @@ export default function App() {
     .map((asset, originalIndex) => ({ asset, originalIndex }))
     .filter(({ asset }) => asset.generation_type === activeTab);
 
-  return (
-    <div className="p-6 max-w-6xl mx-auto">
+  return(
+      <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -281,7 +329,26 @@ export default function App() {
         <input className="border rounded p-2 col-span-2" placeholder="Palette, comma separated"
           value={palette} onChange={(e) => setPalette(e.target.value)} />
       </div>
-
+      <div className="border rounded p-3 mb-4 bg-gray-50">
+        <label className="text-sm font-semibold block mb-1">Game world / story (optional)</label>
+        <textarea className="border rounded p-2 w-full mb-2" rows={2}
+          placeholder="e.g. A crumbling cyberpunk city run by rogue AI wolves who worship broken machinery as gods"
+          value={masterPrompt} onChange={(e) => setMasterPrompt(e.target.value)} />
+        <div className="flex gap-2 items-start mb-2">
+          <textarea className="border rounded p-2 w-full" rows={2}
+            placeholder="AI-enhanced world description (used as context for every block's Enhance button)"
+            value={masterPromptEnhanced} onChange={(e) => setMasterPromptEnhanced(e.target.value)} />
+          <button className="border rounded p-2 bg-gray-200 whitespace-nowrap" onClick={enhanceMasterPrompt}>
+            Enhance ✨
+          </button>
+        </div>
+        {(masterPromptEnhanced || masterPrompt) && assets.length > 0 && (
+          <button className="border rounded p-2 bg-blue-500 text-white text-sm"
+            onClick={autoFillFromWorld}>
+            Auto-fill empty blocks from world ✨
+          </button>
+        )}
+        </div>
       <div className="flex gap-2 items-center mb-4">
         <select
           className="border rounded p-2 flex-1"

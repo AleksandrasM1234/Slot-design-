@@ -25,6 +25,8 @@ class ThemeRequest(BaseModel):
     art_style: str
     palette: list[str]
     assets: list[AssetRequest]
+    master_prompt: str = ""
+    master_prompt_enhanced: str | None = None
 
 
 class CreateAssetRequest(BaseModel):
@@ -43,7 +45,12 @@ class EnhancePromptRequest(BaseModel):
     palette: list[str]
     category: str
     is_animation: bool = False
+    master_context: str | None = None
 
+class EnhanceMasterPromptRequest(BaseModel):
+    base_prompt: str
+    art_style: str
+    palette: list[str]
 
 class EnhancePromptResponse(BaseModel):
     enhanced_prompt: str
@@ -54,3 +61,11 @@ class SaveFrameworkRequest(BaseModel):
     display_name: str
     description: str = ""
     blueprint_keys: list[str]
+
+class GenerateFromWorldRequest(BaseModel):
+    role_display_name: str
+    category: str
+    is_animation: bool = False
+    art_style: str
+    palette: list[str]
+    master_context: str

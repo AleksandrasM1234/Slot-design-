@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from asset_pipeline.api.schemas import (
     CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
-    EnhancePromptResponse, SaveFrameworkRequest,
+    EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest,
 )
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
@@ -185,9 +185,16 @@ def enhance_prompt(payload: EnhancePromptRequest):
         payload.palette,
         is_animation=payload.is_animation,
         needs_isolation=category_needs_isolation(payload.category),
+        master_context=payload.master_context,
     )
     return EnhancePromptResponse(enhanced_prompt=enhanced)
 
+
+@app.post("/prompts/enhance-master", response_model=EnhancePromptResponse)
+def enhance_master_prompt(payload: EnhanceMasterPromptRequest):
+    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhanced = enhancer.enhance_master(payload.base_prompt, payload.art_style, payload.palette)
+    return EnhancePromptResponse(enhanced_prompt=enhanced)
 
 @app.post("/themes")
 def save_theme(payload: SaveThemeRequest):
@@ -228,3 +235,16 @@ def delete_framework(key: str):
         raise HTTPException(status_code=404, detail="Framework not found.")
 
     return {"status": "deleted", "key": key}
+
+@app.post("/prompts/generate-from-world", response_model=EnhancePromptResponse)
+def generate_from_world(payload: GenerateFromWorldRequest):
+    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    generated = enhancer.generate_from_world(
+        payload.role_display_name,
+        payload.master_context,
+        payload.art_style,
+        payload.palette,
+        is_animation=payload.is_animation,
+        needs_isolation=category_needs_isolation(payload.category),
+    )
+    return EnhancePromptResponse(enhanced_prompt=generated)

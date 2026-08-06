@@ -48,3 +48,5 @@ class Theme:
     art_style: str
     palette: tuple[str, ...]
     assets: tuple[AssetSpec, ...]
+    master_prompt: str = ""
+    master_prompt_enhanced: str | None = None

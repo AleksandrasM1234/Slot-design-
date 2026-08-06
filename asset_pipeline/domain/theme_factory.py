@@ -29,4 +29,6 @@ def theme_from_request(theme_request) -> Theme:
         art_style=theme_request.art_style,
         palette=tuple(theme_request.palette),
         assets=assets,
+        master_prompt=theme_request.master_prompt,
+        master_prompt_enhanced=theme_request.master_prompt_enhanced,
     )

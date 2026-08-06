@@ -8,6 +8,8 @@ def theme_to_dict(theme: Theme) -> dict:
         "name": theme.name,
         "art_style": theme.art_style,
         "palette": list(theme.palette),
+        "master_prompt": theme.master_prompt,
+        "master_prompt_enhanced": theme.master_prompt_enhanced,
         "assets": [
             {
                 "name": a.name,
@@ -55,4 +57,6 @@ def theme_from_dict(data: dict) -> Theme:
         art_style=data["art_style"],
         palette=tuple(data["palette"]),
         assets=assets,
+        master_prompt=data.get("master_prompt", ""),
+        master_prompt_enhanced=data.get("master_prompt_enhanced"),
     )
