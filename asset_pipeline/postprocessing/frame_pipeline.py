@@ -32,6 +32,16 @@ class UpscaleStageAdapter(FrameStage):
         return self.strategy.upscale(image.convert("RGBA"), self.scale_factor)
 
 
+class FinalResizeStage(FrameStage):
+
+    def __init__(self, target_width: int, target_height: int):
+        self.target_width = target_width
+        self.target_height = target_height
+
+    def execute(self, image: Image.Image) -> Image.Image:
+        return image.resize((self.target_width, self.target_height), Image.LANCZOS)
+
+
 class FramePipeline:
 
     def __init__(self, stages: list[FrameStage]):
@@ -44,7 +54,8 @@ class FramePipeline:
         return img
 
 
-def build_frame_pipeline(config: PostProcessingConfig) -> FramePipeline:
+def build_frame_pipeline(config: PostProcessingConfig,
+                          target_width: int, target_height: int) -> FramePipeline:
     removal_stage = build_removal_stage(config)
     upscale_strategy = build_upscale_strategy(config.upscale_strategy)
 
@@ -61,4 +72,5 @@ def build_frame_pipeline(config: PostProcessingConfig) -> FramePipeline:
     else:
         raise ValueError(f"Unknown removal_mode: {config.removal_mode}")
 
+    stages.append(FinalResizeStage(target_width, target_height))
     return FramePipeline(stages)

@@ -39,7 +39,8 @@ export default function App() {
   const [newFrameworkCounts, setNewFrameworkCounts] = useState({});
   const [masterPrompt, setMasterPrompt] = useState("");
   const [masterPromptEnhanced, setMasterPromptEnhanced] = useState("");
-  
+  const [batchStatus, setBatchStatus] = useState(null);
+
   useEffect(() => {
     refreshThemeList();
     refreshModelList();
@@ -311,7 +312,78 @@ export default function App() {
     });
     const data = await res.json();
     updateAsset(index, "jobId", data.job_id);
+    return data.job_id;
   };
+
+  const pollJobUntilDone = async (jobId) => {
+  while (true) {
+    const res = await fetch(`http://localhost:8000/assets/${jobId}`);
+    const data = await res.json();
+    if (data.status === "done" || data.status === "failed") return data;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+};
+
+const generateAllAndDownload = async () => {
+  const readyAssets = assets
+    .map((asset, i) => ({ asset, i }))
+    .filter(({ asset }) => asset.model_id);
+
+  if (readyAssets.length === 0) {
+    alert("No assets have a model selected yet — open each card and pick a model first.");
+    return;
+  }
+
+  setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
+
+  const jobIds = [];
+  for (const { i } of readyAssets) {
+    const jobId = await submitAsset(i);
+    jobIds.push(jobId);
+  }
+
+  setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
+
+  let doneCount = 0;
+  let failedCount = 0;
+  const finishedJobIds = [];
+
+  await Promise.all(
+    jobIds.map(async (jobId) => {
+      const result = await pollJobUntilDone(jobId);
+      if (result.status === "done") {
+        finishedJobIds.push(jobId);
+        doneCount++;
+      } else {
+        failedCount++;
+      }
+      setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
+    })
+  );
+
+  if (finishedJobIds.length === 0) {
+    setBatchStatus(null);
+    alert("All generations failed — nothing to export.");
+    return;
+  }
+
+  setBatchStatus({ phase: "zipping", done: doneCount, total: jobIds.length, failed: failedCount });
+
+  const res = await fetch("http://localhost:8000/export/zip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_ids: finishedJobIds }),
+  });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${gameName || "assets"}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  setBatchStatus(null);
+};
 
   const visibleAssets = assets
     .map((asset, originalIndex) => ({ asset, originalIndex }))
@@ -387,25 +459,40 @@ export default function App() {
         </button>
       </div>
 
-      <div className="mb-4 flex gap-2 flex-wrap">
+      <div className="mb-4 flex gap-2 flex-wrap items-center">
         <button className="border rounded p-2 bg-gray-200" onClick={() => setShowPicker(true)}>
           + Add block
         </button>
-        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowFrameworkPicker(true)}>
-          Load framework
-        </button>
-        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowCreateFramework(true)}>
-          + Create framework
-        </button>
-        <label className="border rounded p-2 bg-gray-200 cursor-pointer">
-          Import framework
-          <input type="file" accept="application/json" className="hidden"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              if (file) importFramework(file);
-            }} />
-        </label>
-      </div>
+  <button className="border rounded p-2 bg-gray-200" onClick={() => setShowFrameworkPicker(true)}>
+    Load framework
+  </button>
+  <button className="border rounded p-2 bg-gray-200" onClick={() => setShowCreateFramework(true)}>
+    + Create framework
+  </button>
+  <label className="border rounded p-2 bg-gray-200 cursor-pointer">
+    Import framework
+    <input type="file" accept="application/json" className="hidden"
+      onChange={(e) => {
+        const file = e.target.files[0];
+        if (file) importFramework(file);
+      }} />
+  </label>
+  <button
+    className="border rounded p-2 bg-green-600 text-white disabled:opacity-50"
+    onClick={generateAllAndDownload}
+    disabled={batchStatus !== null || assets.length === 0}
+  >
+    {batchStatus ? "Generating..." : "Generate All & Download ZIP"}
+  </button>
+  {batchStatus && (
+    <span className="text-sm text-gray-500">
+      {batchStatus.phase === "submitting" && `Submitting ${batchStatus.total} jobs...`}
+      {batchStatus.phase === "waiting" &&
+        `${batchStatus.done + batchStatus.failed}/${batchStatus.total} finished (${batchStatus.failed} failed)`}
+      {batchStatus.phase === "zipping" && "Building ZIP..."}
+    </span>
+  )}
+</div>
 
       {showPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"

@@ -1,5 +1,9 @@
 import os
 import uuid
+import io
+import zipfile
+from fastapi.responses import StreamingResponse
+from asset_pipeline.generation.model_catalog import models_for_type, find_model
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +11,7 @@ from fastapi import HTTPException
 
 from asset_pipeline.api.schemas import (
     CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
-    EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest,
+    EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest, ExportZipRequest
 )
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
@@ -104,18 +108,54 @@ async def import_asset(
 def list_assets():
     return [job.__dict__ for job in repository.list_all()]
 
+def _serialize_model(m):
+    return {
+        "name": m.display_name,
+        "model_id": m.model_id,
+        "resolution_mode": m.resolution_mode,
+        "valid_resolutions": [
+            {"width": w, "height": h, "ratio": label}
+            for w, h, _, label in m.valid_resolutions
+        ],
+        "min_width": m.min_width,
+        "max_width": m.max_width,
+        "min_height": m.min_height,
+        "max_height": m.max_height,
+        "step": m.step,
+        "min_duration": m.min_duration,
+        "max_duration": m.max_duration,
+    }
+
+@app.post("/export/zip")
+def export_zip(payload: ExportZipRequest):
+    buffer = io.BytesIO()
+
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for job_id in payload.job_ids:
+            job = repository.get(job_id)
+            if not job or job.status != JobStatus.DONE:
+                continue
+
+            for idx, path in enumerate(job.result_paths):
+                if not os.path.exists(path):
+                    continue
+                extension = os.path.splitext(path)[1]
+                suffix = f"_{idx}" if len(job.result_paths) > 1 else ""
+                arcname = f"{job.asset_name}{suffix}{extension}"
+                zf.write(path, arcname=arcname)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=assets.zip"},
+    )
 
 @app.get("/models")
 def list_models():
     return {
-        "image": [
-            {"name": m.display_name, "model_id": m.model_id}
-            for m in models_for_type(GenerationType.IMAGE)
-        ],
-        "animation": [
-            {"name": m.display_name, "model_id": m.model_id}
-            for m in models_for_type(GenerationType.ANIMATION)
-        ],
+        "image": [_serialize_model(m) for m in models_for_type(GenerationType.IMAGE)],
+        "animation": [_serialize_model(m) for m in models_for_type(GenerationType.ANIMATION)],
     }
 
 
@@ -248,3 +288,15 @@ def generate_from_world(payload: GenerateFromWorldRequest):
         needs_isolation=category_needs_isolation(payload.category),
     )
     return EnhancePromptResponse(enhanced_prompt=generated)
+
+@app.get("/assets/{job_id}")
+def get_asset(job_id: str):
+    job = repository.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {
+        "id": job.id,
+        "status": job.status.value,
+        "result_paths": job.result_paths,
+        "error": job.error,
+    }

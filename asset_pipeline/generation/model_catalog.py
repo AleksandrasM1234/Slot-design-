@@ -10,12 +10,14 @@ class ModelOption:
     generation_type: GenerationType
     api_version: str = "v1"
     resolution_mode: str = "continuous"
-    valid_resolutions: tuple[tuple[int, int], ...] = ()
+    valid_resolutions: tuple[tuple[int, int, str, str], ...] = ()
     min_width: int = 256
     min_height: int = 256
     max_width: int = 1536
     max_height: int = 1536
-    video_mode: str | None = None
+    step: int = 1
+    min_duration: float | None = None
+    max_duration: float | None = None
 
 
 IMAGE_MODELS = (
@@ -23,42 +25,78 @@ IMAGE_MODELS = (
         "Nano Banana 2", "nano-banana-2", "leonardo", GenerationType.IMAGE,
         api_version="v2", resolution_mode="enumerated",
         valid_resolutions=(
-            (1024, 1024), (848, 1264), (1264, 848), (896, 1200), (1200, 896),
-            (928, 1152), (1152, 928), (768, 1376), (1376, 768), (1584, 672),
+            (1024, 1024, "", "1:1"),
+            (848, 1264, "", "2:3"),
+            (1264, 848, "", "3:2"),
+            (896, 1200, "", "3:4"),
+            (1200, 896, "", "4:3"),
+            (928, 1152, "", "4:5"),
+            (1152, 928, "", "5:4"),
+            (768, 1376, "", "9:16"),
+            (1376, 768, "", "16:9"),
+            (1584, 672, "", "21:9"),
         ),
     ),
     ModelOption(
         "FLUX.2 Pro", "flux-pro-2.0", "leonardo", GenerationType.IMAGE,
-        api_version="v2", resolution_mode="continuous",
-        min_width=256, min_height=256, max_width=1440, max_height=1440,
+        api_version="v2", resolution_mode="enumerated",
+        valid_resolutions=(
+            (960, 1440, "", "2:3"),
+            (1440, 1440, "", "1:1"),
+            (1440, 810, "", "16:9"),
+            (810, 1440, "", "9:16"),
+        ),
+    ),
+    ModelOption(
+        "GPT Image 2", "gpt-image-2", "leonardo", GenerationType.IMAGE,
+        api_version="v2", resolution_mode="enumerated",
+        valid_resolutions=(
+            (1024, 1024, "", "1:1"),
+            (848, 1264, "", "2:3"),
+            (1264, 848, "", "3:2"),
+            (1376, 768, "", "16:9"),
+            (768, 1376, "", "9:16"),
+        ),
     ),
     ModelOption(
         "FLUX Dev", "b2614463-296c-462a-9586-aafdb8f00e36", "leonardo", GenerationType.IMAGE,
         api_version="v1", resolution_mode="continuous",
-        min_width=512, min_height=512, max_width=1536, max_height=1536,
-    ),
-    ModelOption(
-        "GPT Image 2 (unverified)", "gpt-image-2", "leonardo", GenerationType.IMAGE,
-        api_version="v2", resolution_mode="continuous",
-        min_width=512, min_height=512, max_width=1536, max_height=1536,
+        min_width=480, min_height=480, max_width=2048, max_height=2048, step=8,
     ),
 )
 
 ANIMATION_MODELS = (
     ModelOption(
         "Kling 3.0", "kling-3.0", "leonardo", GenerationType.ANIMATION,
-        api_version="v2", resolution_mode="enumerated", video_mode="RESOLUTION_720",
-        valid_resolutions=((1280, 720), (960, 960), (720, 1280)),
+        api_version="v2", resolution_mode="enumerated",
+        valid_resolutions=(
+            (1280, 720, "RESOLUTION_720", "16:9 (720p)"),
+            (960, 960, "RESOLUTION_720", "1:1 (720p)"),
+            (720, 1280, "RESOLUTION_720", "9:16 (720p)"),
+            (1920, 1080, "RESOLUTION_1080", "16:9 (1080p)"),
+            (1440, 1440, "RESOLUTION_1080", "1:1 (1080p)"),
+            (1080, 1920, "RESOLUTION_1080", "9:16 (1080p)"),
+        ),
+        min_duration=3, max_duration=15,
     ),
     ModelOption(
-        "Hailuo 2.3 (unverified)", "hailuo-2-3", "leonardo", GenerationType.ANIMATION,
-        api_version="v2", resolution_mode="continuous",
-        min_width=512, min_height=512, max_width=1920, max_height=1920,
+        "Wan 2.7", "wan-2.7", "leonardo", GenerationType.ANIMATION,
+        api_version="v2", resolution_mode="enumerated",
+        valid_resolutions=(
+            (1280, 720, "RESOLUTION_720", "16:9 (720p)"),
+            (960, 960, "RESOLUTION_720", "1:1 (720p)"),
+            (720, 1280, "RESOLUTION_720", "9:16 (720p)"),
+            (1920, 1080, "RESOLUTION_1080", "16:9 (1080p)"),
+            (1440, 1440, "RESOLUTION_1080", "1:1 (1080p)"),
+            (1080, 1920, "RESOLUTION_1080", "9:16 (1080p)"),
+        ),
+        min_duration=2, max_duration=10,
     ),
     ModelOption(
-        "Seedance 2.0 (unverified)", "seedance-2-0", "leonardo", GenerationType.ANIMATION,
+        "Seedance 2.0 (resolution unverified)", "seedance-2-0", "leonardo", GenerationType.ANIMATION,
         api_version="v2", resolution_mode="continuous",
         min_width=512, min_height=512, max_width=1920, max_height=1920,
+        min_duration=4, max_duration=15,
     ),
 )
 

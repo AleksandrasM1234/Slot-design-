@@ -17,15 +17,17 @@ class AssetJobRunner:
         self._output_dir = output_dir
 
     async def run(self, job: AssetJob, theme: Theme, asset: AssetSpec) -> None:
+        loop = asyncio.get_running_loop()
+
         async def notify(status_str: str):
             job.status = JobStatus(status_str)
             self._repository.save(job)
             await self._broadcaster.notify(job)
 
-        try:
-            def on_status(status_str: str):
-                asyncio.create_task(notify(status_str))
+        def on_status(status_str: str):
+            asyncio.run_coroutine_threadsafe(notify(status_str), loop)
 
+        try:
             images = await asyncio.to_thread(
                 self._pipeline.produce, theme, asset, on_status
             )
