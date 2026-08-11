@@ -47,6 +47,8 @@ class EnhancePromptRequest(BaseModel):
     category: str
     is_animation: bool = False
     master_context: str | None = None
+    role_constant: str | None = None
+    has_reference_image: bool = False
 
 class EnhanceMasterPromptRequest(BaseModel):
     base_prompt: str
@@ -73,3 +75,16 @@ class GenerateFromWorldRequest(BaseModel):
 
 class ExportZipRequest(BaseModel):
     job_ids: list[str]
+
+class ReprocessRequest(BaseModel):
+    index: int = 0
+    commit: bool = False
+    edge_tolerance: int = 45
+    interior_tolerance: int = 32
+    soft_edge_margin: int = 18
+    feather_radius: float = 1.0
+    chroma: str = "green"
+    removal_mode: str = "color"
+    ml_model: str = "isnet-general-use"
+    upscale_strategy: str = "lanczos"
+    scale_factor: int = 4

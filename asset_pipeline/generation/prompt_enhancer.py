@@ -10,7 +10,7 @@ class PromptEnhancer(ABC):
     @abstractmethod
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
-                master_context: str | None = None) -> str:
+                master_context: str | None = None, role_constant: str | None = None, has_reference_image: bool = False) -> str:
         ...
 
     @abstractmethod
@@ -43,14 +43,19 @@ class GroqPromptEnhancer(PromptEnhancer):
         return response.choices[0].message.content.strip()
 
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
-                is_animation: bool = False, needs_isolation: bool = True,
-                master_context: str | None = None) -> str:
+            is_animation: bool = False, needs_isolation: bool = True,
+            master_context: str | None = None, role_constant: str | None = None, has_reference_image: bool = False) -> str:
         style_context = ", ".join(palette)
 
         style_rules = (
             "You are an expert AI Prompt Engineer for slot game assets. Your job is to take "
             "a raw user idea and generate a detailed, high-quality prompt.\n\n"
         )
+
+        if role_constant:
+            style_rules += (
+                f"ASSET IDENTITY (highest priority — never violate this): {role_constant}\n\n"
+            )   
 
         if master_context:
             style_rules += (
@@ -101,7 +106,27 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "the exact same frame, fluid continuous motion'.\n"
                 "9. STATIC CAMERA: The camera must not move, pan, or zoom — only the subject "
                 "animates.\n"
+                "10. PRESERVE IDENTITY: The animated subject must remain recognizably the exact "
+                "same object or character described above — do not let it morph, change shape, or "
+                "gain new features. Only add motion, glow, particles, or energy effects around or "
+                "through it.\n"
+                "11. REWARDING ENERGY: If this animation represents a win, celebration, or reward "
+                "moment, make it feel exciting, vivid, and entertaining — dynamic motion, sparkle, "
+                "pulsing light — never flat or static-feeling.\n"
+                "12. NO LIGHT OR PARTICLE BLEED: Any glow, sparks, or particle effects must stay "
+                "tightly contained to the subject's silhouette and never spread onto or beyond the "
+                "background.\n"
+
             )
+
+            if has_reference_image:
+                style_rules += (
+                    "13. LOCKED FIRST FRAME: A reference image has been provided as the exact "
+                    "starting frame. State explicitly in the prompt that the animation must begin "
+                    "from this exact image with no changes to its shape, proportions, colors, or "
+                    "design — describe the motion as happening TO this fixed subject, not as a new "
+                    "reinterpretation of it. Repeat this constraint in two different phrasings.\n"
+                )
         else:
             style_rules += (
                 "8. STATIC POSE: Describe a clean, clear static pose suited for sprite "
@@ -176,7 +201,13 @@ class GroqPromptEnhancer(PromptEnhancer):
         )
 
         if is_animation:
-            system_prompt += "8. SEAMLESS LOOP, STATIC CAMERA.\n"
+            system_prompt += (
+                "8. SEAMLESS LOOP, STATIC CAMERA.\n"
+                "9. PRESERVE IDENTITY: the subject must stay recognizably the same object/character, "
+                "only animating motion and effects around it, never morphing its form.\n"
+                "10. REWARDING ENERGY: if this represents a win or reward, make it vivid and "
+                "entertaining — dynamic motion, sparkle, pulsing light.\n"
+    )
         else:
             system_prompt += "8. STATIC POSE suited for sprite extraction.\n"
 

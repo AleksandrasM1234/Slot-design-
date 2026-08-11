@@ -74,3 +74,22 @@ def build_frame_pipeline(config: PostProcessingConfig,
 
     stages.append(FinalResizeStage(target_width, target_height))
     return FramePipeline(stages)
+
+def build_reprocess_pipeline(config: PostProcessingConfig) -> FramePipeline:
+    removal_stage = build_removal_stage(config)
+    upscale_strategy = build_upscale_strategy(config.upscale_strategy)
+
+    if config.removal_mode == "color":
+        stages = [
+            UpscaleStageAdapter(upscale_strategy, config.scale_factor),
+            RemovalStageAdapter(removal_stage),
+        ]
+    elif config.removal_mode == "ml":
+        stages = [
+            RemovalStageAdapter(removal_stage),
+            UpscaleStageAdapter(upscale_strategy, config.scale_factor),
+        ]
+    else:
+        raise ValueError(f"Unknown removal_mode: {config.removal_mode}")
+
+    return FramePipeline(stages)

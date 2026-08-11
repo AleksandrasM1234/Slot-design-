@@ -19,5 +19,7 @@ class AssetJob:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: JobStatus = JobStatus.QUEUED
     result_paths: list[str] = field(default_factory=list)
+    raw_paths: list[str] = field(default_factory=list)
+    video_path: str | None = None
     error: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)

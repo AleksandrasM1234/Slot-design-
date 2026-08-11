@@ -2,6 +2,10 @@ import os
 import uuid
 import io
 import zipfile
+from PIL import Image
+from asset_pipeline.postprocessing.config import PostProcessingConfig
+from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline, build_reprocess_pipeline
+from asset_pipeline.api.schemas import ReprocessRequest
 from fastapi.responses import StreamingResponse
 from asset_pipeline.generation.model_catalog import models_for_type, find_model
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, UploadFile, File, Form
@@ -226,6 +230,8 @@ def enhance_prompt(payload: EnhancePromptRequest):
         is_animation=payload.is_animation,
         needs_isolation=category_needs_isolation(payload.category),
         master_context=payload.master_context,
+        role_constant=payload.role_constant,
+        has_reference_image=payload.has_reference_image,
     )
     return EnhancePromptResponse(enhanced_prompt=enhanced)
 
@@ -298,6 +304,7 @@ def get_asset(job_id: str):
         "id": job.id,
         "status": job.status.value,
         "result_paths": job.result_paths,
+        "video_path": job.video_path,
         "error": job.error,
     }
 
@@ -309,3 +316,34 @@ def list_output_files():
         for f in files
         if os.path.isfile(f"output/{f}")
     ]
+
+@app.post("/assets/{job_id}/reprocess")
+def reprocess_asset(job_id: str, payload: ReprocessRequest):
+    job = repository.get(job_id)
+    if not job or not job.raw_paths or payload.index >= len(job.raw_paths):
+        raise HTTPException(status_code=404, detail="Raw asset not found for reprocessing.")
+
+    raw_image = Image.open(job.raw_paths[payload.index]).convert("RGBA")
+
+    config = PostProcessingConfig(
+        edge_tolerance=payload.edge_tolerance,
+        interior_tolerance=payload.interior_tolerance,
+        soft_edge_margin=payload.soft_edge_margin,
+        feather_radius=payload.feather_radius,
+        chroma=payload.chroma,
+        removal_mode=payload.removal_mode,
+        ml_model=payload.ml_model,
+        upscale_strategy=payload.upscale_strategy,
+        scale_factor=payload.scale_factor,
+    )
+    pipeline = build_reprocess_pipeline(config)
+    processed = pipeline.run(raw_image)
+
+    if payload.commit:
+        target_path = job.result_paths[payload.index]
+        processed.save(target_path)
+        return {"path": target_path, "committed": True}
+
+    preview_path = f"output/{job_id}_preview_{payload.index}.png"
+    processed.save(preview_path)
+    return {"path": preview_path, "committed": False}

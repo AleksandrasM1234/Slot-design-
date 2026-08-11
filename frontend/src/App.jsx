@@ -283,6 +283,8 @@ export default function App() {
         category: asset.category,
         is_animation: asset.generation_type === "animation",
         master_context: masterPromptEnhanced || masterPrompt || null,
+        role_constant: asset.role_constant || null,
+        has_reference_image: Boolean(asset.reference_image_path),
       }),
     });
     const data = await res.json();
@@ -309,7 +311,6 @@ export default function App() {
 
     for (let i = 0; i < assets.length; i++) {
       const asset = assets[i];
-      if (asset.description.trim() !== "") continue;
 
       const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
       const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
@@ -440,7 +441,7 @@ export default function App() {
       <div className="border rounded p-3 mb-4 bg-gray-50">
         <label className="text-sm font-semibold block mb-1">Game world / story (optional)</label>
         <textarea className="border rounded p-2 w-full mb-2" rows={2}
-          placeholder="e.g. A crumbling cyberpunk city run by rogue AI wolves who worship broken machinery as gods"
+          placeholder="e.g. A forgotten desert kingdom where ancient pharaohs' treasures are sealed behind cursed golden vaults"
           value={masterPrompt} onChange={(e) => setMasterPrompt(e.target.value)} />
         <div className="flex gap-2 items-start mb-2">
           <textarea className="border rounded p-2 w-full" rows={2}

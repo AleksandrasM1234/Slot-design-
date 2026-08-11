@@ -13,9 +13,11 @@ from asset_pipeline.generation.resolution_resolver import resolve_generation_siz
 class LeonardoProvider(ImageGenerationProvider):
 
     BASE_URL = "https://cloud.leonardo.ai/api/rest"
+    STYLE_REFERENCE_PREPROCESSOR_ID = 67
 
     def __init__(self, api_key: str, model: ModelOption,
-                 poll_interval: float = 2.0, timeout: float = 180.0):
+                 poll_interval: float = 3.0, timeout: float = 180.0,
+                 video_timeout: float = 600.0):
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -23,6 +25,7 @@ class LeonardoProvider(ImageGenerationProvider):
         self._model = model
         self._poll_interval = poll_interval
         self._timeout = timeout
+        self._video_timeout = video_timeout
 
     def generate(self, request: GenerationRequest) -> GenerationResult:
         if self._model.generation_type == GenerationType.ANIMATION:
@@ -55,8 +58,6 @@ class LeonardoProvider(ImageGenerationProvider):
         return image_id
 
     # -------------------- image generation --------------------
-
-    STYLE_REFERENCE_PREPROCESSOR_ID = 67
 
     def _generate_image(self, request: GenerationRequest) -> GenerationResult:
         width, height, mode = resolve_generation_size(request.width, request.height, self._model)
@@ -135,11 +136,11 @@ class LeonardoProvider(ImageGenerationProvider):
             }
 
         url = f"{self.BASE_URL}/v2/generations"
-        return self._submit_and_poll(url, payload)
+        return self._submit_and_poll(url, payload, timeout=self._video_timeout)
 
     # -------------------- shared submit/poll --------------------
 
-    def _submit_and_poll(self, url: str, payload: dict) -> GenerationResult:
+    def _submit_and_poll(self, url: str, payload: dict, timeout: float | None = None) -> GenerationResult:
         response = requests.post(url, json=payload, headers=self._headers)
         if not response.ok:
             raise RuntimeError(
@@ -163,13 +164,13 @@ class LeonardoProvider(ImageGenerationProvider):
                 f"Could not find a generation id in the response. Raw response: {data}"
             )
 
-        return self._poll(generation_id)
+        return self._poll(generation_id, timeout or self._timeout)
 
-    def _poll(self, generation_id: str) -> GenerationResult:
+    def _poll(self, generation_id: str, timeout: float) -> GenerationResult:
         poll_url = f"{self.BASE_URL}/v1/generations/{generation_id}"
 
         elapsed = 0.0
-        while elapsed < self._timeout:
+        while elapsed < timeout:
             response = requests.get(poll_url, headers=self._headers)
             if not response.ok:
                 raise RuntimeError(
@@ -194,4 +195,8 @@ class LeonardoProvider(ImageGenerationProvider):
             time.sleep(self._poll_interval)
             elapsed += self._poll_interval
 
-        raise TimeoutError(f"Generation {generation_id} timed out")
+        raise TimeoutError(
+            f"Generation {generation_id} timed out after {timeout:.0f}s. "
+            f"Video generations can take several minutes — if this keeps happening, "
+            f"the timeout may need to be increased further."
+        )

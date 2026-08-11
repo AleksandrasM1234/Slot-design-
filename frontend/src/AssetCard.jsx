@@ -12,17 +12,6 @@ const CHECKERBOARD_STYLE = {
   backgroundImage: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 12px 12px",
 };
 
-const downloadFile = async (path, filename) => {
-  const res = await fetch(`http://localhost:8000/${path}`);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
 const uploadReferenceImage = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -46,6 +35,17 @@ const importAsset = async (name, category, generationType, file) => {
     body: formData,
   });
   return res.json();
+};
+
+const downloadFile = async (path, filename) => {
+  const res = await fetch(`http://localhost:8000/${path}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 function ProgressBar({ status }) {
@@ -199,6 +199,128 @@ function ResolutionControl({ asset, index, updateAsset, selectedModel }) {
   );
 }
 
+function BackgroundRemovalPanel({ jobId, index, onApplied, onClose }) {
+  const [settings, setSettings] = useState({
+    edge_tolerance: 45,
+    interior_tolerance: 32,
+    soft_edge_margin: 18,
+    feather_radius: 1.0,
+    chroma: "green",
+    removal_mode: "color",
+    ml_model: "isnet-general-use",
+    upscale_strategy: "lanczos",
+    scale_factor: 4,
+  });
+  const [previewPath, setPreviewPath] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const update = (field, value) => setSettings((prev) => ({ ...prev, [field]: value }));
+
+  const runPreview = async () => {
+    setLoading(true);
+    const res = await fetch(`http://localhost:8000/assets/${jobId}/reprocess`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index, commit: false, ...settings }),
+    });
+    const data = await res.json();
+    setPreviewPath(`${data.path}?t=${Date.now()}`);
+    setLoading(false);
+  };
+
+  const applyChanges = async () => {
+    setLoading(true);
+    await fetch(`http://localhost:8000/assets/${jobId}/reprocess`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index, commit: true, ...settings }),
+    });
+    setLoading(false);
+    onApplied?.();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-[70vw] max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">Background removal settings</h3>
+          <button className="text-gray-500" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <label className="block text-sm">
+              Removal mode
+              <select className="border rounded p-2 w-full mt-1" value={settings.removal_mode}
+                onChange={(e) => update("removal_mode", e.target.value)}>
+                <option value="color">Color key (chroma green screen)</option>
+                <option value="ml">ML segmentation (rembg)</option>
+              </select>
+            </label>
+
+            {settings.removal_mode === "color" && (
+              <label className="block text-sm">
+                Chroma color
+                <select className="border rounded p-2 w-full mt-1" value={settings.chroma}
+                  onChange={(e) => update("chroma", e.target.value)}>
+                  <option value="green">Green</option>
+                  <option value="magenta">Magenta</option>
+                  <option value="white">White</option>
+                </select>
+              </label>
+            )}
+
+            <label className="block text-sm">
+              Outer edge tolerance: {settings.edge_tolerance}
+              <input type="range" min="0" max="100" value={settings.edge_tolerance}
+                onChange={(e) => update("edge_tolerance", Number(e.target.value))} className="w-full" />
+            </label>
+            <label className="block text-sm">
+              Interior gap tolerance: {settings.interior_tolerance}
+              <input type="range" min="0" max="100" value={settings.interior_tolerance}
+                onChange={(e) => update("interior_tolerance", Number(e.target.value))} className="w-full" />
+            </label>
+            <label className="block text-sm">
+              Glow width: {settings.soft_edge_margin}
+              <input type="range" min="1" max="150" value={settings.soft_edge_margin}
+                onChange={(e) => update("soft_edge_margin", Number(e.target.value))} className="w-full" />
+            </label>
+            <label className="block text-sm">
+              Edge smoothing: {settings.feather_radius}
+              <input type="range" min="0" max="30" step="0.5" value={settings.feather_radius}
+                onChange={(e) => update("feather_radius", Number(e.target.value))} className="w-full" />
+            </label>
+            <label className="block text-sm">
+              Upscale factor: {settings.scale_factor}x
+              <input type="range" min="1" max="4" value={settings.scale_factor}
+                onChange={(e) => update("scale_factor", Number(e.target.value))} className="w-full" />
+            </label>
+
+            <button className="border rounded p-2 bg-gray-200 w-full" onClick={runPreview} disabled={loading}>
+              {loading ? "Working..." : "Preview"}
+            </button>
+            <button className="border rounded p-2 bg-blue-500 text-white w-full" onClick={applyChanges} disabled={loading}>
+              Apply to this asset
+            </button>
+          </div>
+
+          <div>
+            <div className="text-sm text-gray-500 mb-1">Preview</div>
+            <div className="border rounded p-2 h-64 flex items-center justify-center" style={CHECKERBOARD_STYLE}>
+              {previewPath ? (
+                <img src={`http://localhost:8000/${previewPath}`} alt="preview" className="max-h-full max-w-full" />
+              ) : (
+                <span className="text-gray-400 text-sm">Click Preview to see the result</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AssetCard({
   asset, index, updateAsset, enhancePrompt, submitAsset,
   imageModels, animationModels, onAssetDone,
@@ -206,8 +328,11 @@ export default function AssetCard({
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(null);
   const [resultPaths, setResultPaths] = useState([]);
+  const [videoPath, setVideoPath] = useState(null);
   const [error, setError] = useState(null);
   const [showReferencePicker, setShowReferencePicker] = useState(false);
+  const [bgPanelIndex, setBgPanelIndex] = useState(null);
+  const [showFrames, setShowFrames] = useState(false);
 
   useEffect(() => {
     if (!asset.jobId) return;
@@ -218,6 +343,7 @@ export default function AssetCard({
       const data = await res.json();
       setStatus(data.status);
       setResultPaths(data.result_paths || []);
+      setVideoPath(data.video_path || null);
       setError(data.error);
       if (data.status === "done" && data.result_paths?.[0]) {
         onAssetDone?.(data.result_paths[0]);
@@ -230,6 +356,7 @@ export default function AssetCard({
       const data = JSON.parse(event.data);
       setStatus(data.status);
       setResultPaths(data.result_paths || []);
+      setVideoPath(data.video_path || null);
       setError(data.error);
       if (data.status === "done" && data.result_paths?.[0]) {
         onAssetDone?.(data.result_paths[0]);
@@ -489,6 +616,28 @@ export default function AssetCard({
           </div>
         )}
 
+        {videoPath && (
+          <div className="mb-3">
+            <div className="text-sm text-gray-500 mb-1">Full animation preview</div>
+            <video src={`http://localhost:8000/${videoPath}`} controls loop autoPlay className="rounded w-full max-h-64" />
+              {resultPaths.length > 0 && (
+                <button
+                  type="button"
+                  className="border rounded px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 mt-2"
+                  onClick={() => setShowFrames((prev) => !prev)}
+                >
+                  {showFrames ? "Hide PNG sequence" : `View PNG sequence (${resultPaths.length} frames)`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {resultPaths.length > 0 && (!videoPath || showFrames) && (
+            <div className="text-sm text-gray-500 mb-1">
+              {videoPath ? "Extracted frames (background removed)" : "Results"}
+            </div>
+          )}
+          {(!videoPath || showFrames) && (
         <div className="grid grid-cols-3 gap-2">
           {resultPaths.map((path, idx) => {
             const extension = path.split(".").pop();
@@ -499,7 +648,7 @@ export default function AssetCard({
             return (
               <div key={path} className="relative group">
                 <img
-                  src={`http://localhost:8000/${path}`}
+                  src={`http://localhost:8000/${path}?t=${asset.jobId}`}
                   alt={asset.name}
                   className="rounded w-full"
                   style={CHECKERBOARD_STYLE}
@@ -511,10 +660,26 @@ export default function AssetCard({
                 >
                   ⬇ Download
                 </button>
+                <button
+                  type="button"
+                  className="absolute top-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
+                  onClick={() => setBgPanelIndex(idx)}
+                >
+                  ⚙ Background
+                </button>
               </div>
             );
           })}
         </div>
+        )}
+        {bgPanelIndex !== null && (
+          <BackgroundRemovalPanel
+            jobId={asset.jobId}
+            index={bgPanelIndex}
+            onApplied={() => setResultPaths((prev) => [...prev])}
+            onClose={() => setBgPanelIndex(null)}
+          />
+        )}
       </div>
     </div>
   );

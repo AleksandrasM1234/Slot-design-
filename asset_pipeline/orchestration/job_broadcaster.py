@@ -19,6 +19,7 @@ class JobEventBroadcaster:
             "id": job.id,
             "status": job.status.value,
             "result_paths": job.result_paths,
+            "video_path": job.video_path,
             "error": job.error,
         }
         for ws in list(self._subscribers.get(job.id, [])):
