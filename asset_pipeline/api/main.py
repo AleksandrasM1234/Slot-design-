@@ -21,7 +21,7 @@ from asset_pipeline.domain.asset_blueprint import BLUEPRINT_LIBRARY
 from asset_pipeline.domain.framework_preset import FrameworkPreset, FRAMEWORK_PRESETS
 from asset_pipeline.generation.factory import GenerationProviderFactory
 from asset_pipeline.generation.prompt_builder import LeonardoPromptBuilder
-from asset_pipeline.generation.prompt_enhancer import HuggingFacePromptEnhancer, category_needs_isolation
+from asset_pipeline.generation.prompt_enhancer import GroqPromptEnhancer, category_needs_isolation
 from asset_pipeline.generation.model_catalog import models_for_type, find_model
 from asset_pipeline.postprocessing.config import PostProcessingConfig
 from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline
@@ -31,7 +31,7 @@ from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 from asset_pipeline.orchestration.job_runner import AssetJobRunner
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
 from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
-from asset_pipeline.config.settings import LEONARDO_API_KEY, HUGGINGFACE_API_KEY
+from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY
 
 app = FastAPI()
 
@@ -218,7 +218,7 @@ async def upload_reference_image(file: UploadFile = File(...)):
 
 @app.post("/prompts/enhance", response_model=EnhancePromptResponse)
 def enhance_prompt(payload: EnhancePromptRequest):
-    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
     enhanced = enhancer.enhance(
         payload.base_prompt,
         payload.art_style,
@@ -232,7 +232,7 @@ def enhance_prompt(payload: EnhancePromptRequest):
 
 @app.post("/prompts/enhance-master", response_model=EnhancePromptResponse)
 def enhance_master_prompt(payload: EnhanceMasterPromptRequest):
-    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
     enhanced = enhancer.enhance_master(payload.base_prompt, payload.art_style, payload.palette)
     return EnhancePromptResponse(enhanced_prompt=enhanced)
 
@@ -278,7 +278,7 @@ def delete_framework(key: str):
 
 @app.post("/prompts/generate-from-world", response_model=EnhancePromptResponse)
 def generate_from_world(payload: GenerateFromWorldRequest):
-    enhancer = HuggingFacePromptEnhancer(api_token=HUGGINGFACE_API_KEY)
+    enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
     generated = enhancer.generate_from_world(
         payload.role_display_name,
         payload.master_context,
@@ -300,3 +300,12 @@ def get_asset(job_id: str):
         "result_paths": job.result_paths,
         "error": job.error,
     }
+
+@app.get("/api/output-files")
+def list_output_files():
+    files = sorted(os.listdir("output"))
+    return [
+        {"path": f"output/{f}", "filename": f}
+        for f in files
+        if os.path.isfile(f"output/{f}")
+    ]

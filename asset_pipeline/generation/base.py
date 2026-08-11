@@ -13,6 +13,7 @@ class GenerationRequest:
     duration_seconds: float | None = None
     num_outputs: int = 1
     reference_image_path: str | None = None
+    reference_strength: str = "Mid"
 
 
 @dataclass(frozen=True)

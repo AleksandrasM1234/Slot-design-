@@ -41,6 +41,7 @@ class AssetSpec:
     enhanced_prompt: str | None = None
     role_constant: str | None = None
     reference_image_path: str | None = None
+    reference_strength: str = "Mid"
 
 @dataclass(frozen=True)
 class Theme:

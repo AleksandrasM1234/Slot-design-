@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from pyexpat.errors import messages
-from urllib import response
-from huggingface_hub import InferenceClient
+from groq import Groq
 
 
 BACKGROUND_CATEGORIES = {"background", "background_character"}
@@ -21,14 +19,28 @@ class PromptEnhancer(ABC):
 
     @abstractmethod
     def generate_from_world(self, role_display_name: str, master_context: str,
-                         art_style: str, palette: list[str],
-                         is_animation: bool = False, needs_isolation: bool = True) -> str:
+                             art_style: str, palette: list[str],
+                             is_animation: bool = False, needs_isolation: bool = True) -> str:
         ...
 
-class HuggingFacePromptEnhancer(PromptEnhancer):
 
-    def __init__(self, api_token: str, model: str = "Qwen/Qwen2.5-7B-Instruct"):
-        self._client = InferenceClient(model=model, token=api_token)
+class GroqPromptEnhancer(PromptEnhancer):
+
+    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
+        self._client = Groq(api_key=api_key)
+        self._model = model
+
+    def _chat(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temperature,
+            max_tokens=250,
+        )
+        return response.choices[0].message.content.strip()
 
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
@@ -107,13 +119,7 @@ class HuggingFacePromptEnhancer(PromptEnhancer):
             f"Art style: {art_style}. Color palette: {style_context}."
         )
 
-        messages = [
-            {"role": "system", "content": style_rules},
-            {"role": "user", "content": user_prompt},
-        ]
-
-        response = self._client.chat_completion(messages=messages, max_tokens=200, temperature=0.5)
-        return response.choices[0].message.content
+        return self._chat(style_rules, user_prompt, temperature=0.5)
 
     def enhance_master(self, base_prompt: str, art_style: str, palette: list[str]) -> str:
         style_context = ", ".join(palette)
@@ -131,17 +137,11 @@ class HuggingFacePromptEnhancer(PromptEnhancer):
             f"Raw idea: {base_prompt}. Art style: {art_style}. Color palette: {style_context}."
         )
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-
-        response = self._client.chat_completion(messages=messages, max_tokens=200, temperature=0.7)
-        return response.choices[0].message.content
+        return self._chat(system_prompt, user_prompt, temperature=0.7)
 
     def generate_from_world(self, role_display_name: str, master_context: str,
-                         art_style: str, palette: list[str],
-                         is_animation: bool = False, needs_isolation: bool = True) -> str:
+                             art_style: str, palette: list[str],
+                             is_animation: bool = False, needs_isolation: bool = True) -> str:
         style_context = ", ".join(palette)
 
         system_prompt = (
@@ -167,7 +167,7 @@ class HuggingFacePromptEnhancer(PromptEnhancer):
             system_prompt += (
                 "MANDATORY CONSTANT: this is a full scene/background asset, not an isolated "
                 "object — do not put it on a chroma key.\n"
-         )
+            )
 
         system_prompt += (
             "5. NO EMBEDDED TEXT.\n"
@@ -176,7 +176,7 @@ class HuggingFacePromptEnhancer(PromptEnhancer):
         )
 
         if is_animation:
-           system_prompt += "8. SEAMLESS LOOP, STATIC CAMERA.\n"
+            system_prompt += "8. SEAMLESS LOOP, STATIC CAMERA.\n"
         else:
             system_prompt += "8. STATIC POSE suited for sprite extraction.\n"
 
@@ -185,13 +185,9 @@ class HuggingFacePromptEnhancer(PromptEnhancer):
             "Return ONLY the final comma-separated generative prompt, no conversational filler."
         )
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Generate the asset description for: {role_display_name}"},
-        ]
+        user_prompt = f"Generate the asset description for: {role_display_name}"
 
-        response = self._client.chat_completion(messages=messages, max_tokens=200, temperature=0.7)
-        return response.choices[0].message.content
+        return self._chat(system_prompt, user_prompt, temperature=0.7)
 
 
 def category_needs_isolation(category: str) -> bool:

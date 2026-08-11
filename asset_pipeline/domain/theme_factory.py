@@ -13,6 +13,7 @@ def theme_from_request(theme_request) -> Theme:
             enhanced_prompt=a.enhanced_prompt,
             role_constant=a.role_constant,
             reference_image_path=a.reference_image_path,
+            reference_strength=getattr(a, "reference_strength", "Mid"),
             settings=GenerationSettings(
                 generation_type=GenerationType(a.settings.generation_type),
                 width=a.settings.width,

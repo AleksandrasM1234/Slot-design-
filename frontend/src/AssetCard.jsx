@@ -8,6 +8,21 @@ const CATEGORIES = [
 
 const STAGES = ["queued", "generating", "postprocessing", "done"];
 
+const CHECKERBOARD_STYLE = {
+  backgroundImage: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 12px 12px",
+};
+
+const downloadFile = async (path, filename) => {
+  const res = await fetch(`http://localhost:8000/${path}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 const uploadReferenceImage = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -51,6 +66,76 @@ function ProgressBar({ status }) {
         />
       </div>
       <div className="text-xs text-gray-500 mt-1 capitalize">{status}</div>
+    </div>
+  );
+}
+
+function ReferencePicker({ onSelect, onClose }) {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      const [assetsRes, filesRes] = await Promise.all([
+        fetch("http://localhost:8000/assets"),
+        fetch("http://localhost:8000/api/output-files"),
+      ]);
+      const jobs = await assetsRes.json();
+      const files = await filesRes.json();
+
+      const named = new Map();
+      jobs
+        .filter((j) => j.status === "done" && j.result_paths?.length > 0)
+        .forEach((job) => {
+          job.result_paths.forEach((path) => named.set(path, job.asset_name));
+        });
+
+      const merged = files.map((f) => ({
+        path: f.path,
+        label: named.get(f.path) || f.filename,
+      }));
+
+      setItems(merged);
+    };
+    fetchAll();
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg p-6 w-[60vw] max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">Choose a reference</h3>
+          <button className="text-gray-500" onClick={onClose}>✕</button>
+        </div>
+        {items.length === 0 ? (
+          <div className="text-gray-400 text-sm text-center py-8">
+            No generated assets yet — generate something first.
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-3">
+            {items.map((item) => (
+              <button
+                key={item.path}
+                className="border rounded p-1 hover:ring-2 hover:ring-blue-500"
+                onClick={() => onSelect(item.path)}
+              >
+                <img
+                  src={`http://localhost:8000/${item.path}`}
+                  alt={item.label}
+                  className="w-full h-24 object-cover rounded"
+                  style={CHECKERBOARD_STYLE}
+                />
+                <div className="text-xs text-gray-500 truncate mt-1">{item.label}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -116,12 +201,13 @@ function ResolutionControl({ asset, index, updateAsset, selectedModel }) {
 
 export default function AssetCard({
   asset, index, updateAsset, enhancePrompt, submitAsset,
-  imageModels, animationModels,
+  imageModels, animationModels, onAssetDone,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(null);
   const [resultPaths, setResultPaths] = useState([]);
   const [error, setError] = useState(null);
+  const [showReferencePicker, setShowReferencePicker] = useState(false);
 
   useEffect(() => {
     if (!asset.jobId) return;
@@ -133,6 +219,9 @@ export default function AssetCard({
       setStatus(data.status);
       setResultPaths(data.result_paths || []);
       setError(data.error);
+      if (data.status === "done" && data.result_paths?.[0]) {
+        onAssetDone?.(data.result_paths[0]);
+      }
     };
     fetchCurrentStatus();
 
@@ -142,6 +231,9 @@ export default function AssetCard({
       setStatus(data.status);
       setResultPaths(data.result_paths || []);
       setError(data.error);
+      if (data.status === "done" && data.result_paths?.[0]) {
+        onAssetDone?.(data.result_paths[0]);
+      }
     };
     return () => ws.close();
   }, [asset.jobId]);
@@ -163,6 +255,7 @@ export default function AssetCard({
             src={`http://localhost:8000/${resultPaths[0]}`}
             alt={asset.name}
             className="mt-2 rounded w-full h-20 object-cover"
+            style={CHECKERBOARD_STYLE}
           />
         )}
       </div>
@@ -184,37 +277,61 @@ export default function AssetCard({
         </div>
 
         <div className="grid grid-cols-4 gap-2 mb-2">
-          <input className="border rounded p-2" placeholder="Name"
-            value={asset.name} onChange={(e) => updateAsset(index, "name", e.target.value)} />
-          <select className="border rounded p-2" value={asset.category}
-            onChange={(e) => updateAsset(index, "category", e.target.value)}>
+          <input
+            className="border rounded p-2"
+            placeholder="Name"
+            value={asset.name}
+            onChange={(e) => updateAsset(index, "name", e.target.value)}
+          />
+          <select
+            className="border rounded p-2"
+            value={asset.category}
+            onChange={(e) => updateAsset(index, "category", e.target.value)}
+          >
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select className="border rounded p-2" value={asset.generation_type}
+          <select
+            className="border rounded p-2"
+            value={asset.generation_type}
             onChange={(e) => {
               updateAsset(index, "generation_type", e.target.value);
               updateAsset(index, "model_id", "");
-            }}>
+            }}
+          >
             <option value="image">image</option>
             <option value="animation">animation</option>
           </select>
-          <input className="border rounded p-2" type="number" min="1" max="8"
-            placeholder="Number of generations" value={asset.num_outputs}
-            onChange={(e) => updateAsset(index, "num_outputs", e.target.value)} />
+          <input
+            className="border rounded p-2"
+            type="number"
+            min="1"
+            max="8"
+            placeholder="Number of generations"
+            value={asset.num_outputs}
+            onChange={(e) => updateAsset(index, "num_outputs", e.target.value)}
+          />
         </div>
 
-        <textarea className="border rounded p-2 w-full mb-2" rows={2}
+        <textarea
+          className="border rounded p-2 w-full mb-2"
+          rows={2}
           placeholder="Base description (your own words)"
           value={asset.description}
-          onChange={(e) => updateAsset(index, "description", e.target.value)} />
+          onChange={(e) => updateAsset(index, "description", e.target.value)}
+        />
 
         <div className="flex gap-2 items-start mb-2">
-          <textarea className="border rounded p-2 w-full" rows={2}
+          <textarea
+            className="border rounded p-2 w-full"
+            rows={2}
             placeholder="AI-enhanced prompt (editable — this is what actually gets sent)"
             value={asset.enhanced_prompt}
-            onChange={(e) => updateAsset(index, "enhanced_prompt", e.target.value)} />
-          <button className="border rounded p-2 bg-gray-200 whitespace-nowrap"
-            onClick={() => enhancePrompt(index)}>
+            onChange={(e) => updateAsset(index, "enhanced_prompt", e.target.value)}
+          />
+          <button
+            className="border rounded p-2 bg-gray-200 whitespace-nowrap"
+            onClick={() => enhancePrompt(index)}
+          >
             Enhance ✨
           </button>
         </div>
@@ -223,7 +340,7 @@ export default function AssetCard({
           <label className="text-sm text-gray-600 block mb-1">
             Reference image {asset.generation_type === "animation" ? "(first frame)" : "(style guide)"}
           </label>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <input
               type="file"
               accept="image/*"
@@ -235,18 +352,58 @@ export default function AssetCard({
                 updateAsset(index, "reference_image_path", path);
               }}
             />
+            <button
+              type="button"
+              className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+              onClick={() => setShowReferencePicker(true)}
+            >
+              Choose from generated assets
+            </button>
             {asset.reference_image_path && (
-              <img
-                src={`http://localhost:8000/${asset.reference_image_path}`}
-                alt="reference"
-                className="w-12 h-12 object-cover rounded border"
-              />
+              <div className="flex items-center gap-1">
+                <img
+                  src={`http://localhost:8000/${asset.reference_image_path}`}
+                  alt="reference"
+                  className="w-12 h-12 object-cover rounded border"
+                />
+                <button
+                  type="button"
+                  className="text-xs text-red-500"
+                  onClick={() => updateAsset(index, "reference_image_path", null)}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {asset.reference_image_path && (
+              <select
+                className="border rounded p-1 text-sm"
+                value={asset.reference_strength || "Mid"}
+                onChange={(e) => updateAsset(index, "reference_strength", e.target.value)}
+              >
+                <option value="Low">Style: Low</option>
+                <option value="Mid">Style: Mid</option>
+                <option value="High">Style: High</option>
+                <option value="Ultra">Style: Ultra</option>
+                <option value="Max">Style: Max</option>
+              </select>
             )}
           </div>
+          {showReferencePicker && (
+            <ReferencePicker
+              onSelect={(path) => {
+                updateAsset(index, "reference_image_path", path);
+                setShowReferencePicker(false);
+              }}
+              onClose={() => setShowReferencePicker(false)}
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-4 gap-2 mb-2">
-          <select className="border rounded p-2" value={asset.model_id}
+          <select
+            className="border rounded p-2"
+            value={asset.model_id}
             onChange={(e) => {
               updateAsset(index, "model_id", e.target.value);
               const model = modelOptions.find((m) => m.model_id === e.target.value);
@@ -259,7 +416,8 @@ export default function AssetCard({
                   updateAsset(index, "duration_seconds", model.min_duration);
                 }
               }
-            }}>
+            }}
+          >
             <option value="">— Select model —</option>
             {modelOptions.map((m) => (
               <option key={m.model_id} value={m.model_id}>{m.name}</option>
@@ -293,8 +451,10 @@ export default function AssetCard({
           </div>
         )}
 
-        <button className="border rounded p-2 bg-blue-500 text-white w-full mb-2"
-          onClick={() => submitAsset(index)}>
+        <button
+          className="border rounded p-2 bg-blue-500 text-white w-full mb-2"
+          onClick={() => submitAsset(index)}
+        >
           Generate
         </button>
 
@@ -330,10 +490,30 @@ export default function AssetCard({
         )}
 
         <div className="grid grid-cols-3 gap-2">
-          {resultPaths.map((path) => (
-            <img key={path} src={`http://localhost:8000/${path}`}
-              alt={asset.name} className="rounded w-full" />
-          ))}
+          {resultPaths.map((path, idx) => {
+            const extension = path.split(".").pop();
+            const filename = resultPaths.length > 1
+              ? `${asset.name || "asset"}_${idx}.${extension}`
+              : `${asset.name || "asset"}.${extension}`;
+
+            return (
+              <div key={path} className="relative group">
+                <img
+                  src={`http://localhost:8000/${path}`}
+                  alt={asset.name}
+                  className="rounded w-full"
+                  style={CHECKERBOARD_STYLE}
+                />
+                <button
+                  type="button"
+                  className="absolute bottom-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
+                  onClick={() => downloadFile(path, filename)}
+                >
+                  ⬇ Download
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

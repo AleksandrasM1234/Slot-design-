@@ -26,6 +26,7 @@ class LeonardoPromptBuilder(PromptBuilder):
             duration_seconds=asset.settings.duration_seconds,
             num_outputs=asset.settings.num_outputs,
             reference_image_path=asset.reference_image_path,
+            reference_strength=asset.reference_strength,
         )
 
     @staticmethod

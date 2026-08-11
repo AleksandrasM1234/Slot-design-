@@ -56,6 +56,8 @@ class LeonardoProvider(ImageGenerationProvider):
 
     # -------------------- image generation --------------------
 
+    STYLE_REFERENCE_PREPROCESSOR_ID = 67
+
     def _generate_image(self, request: GenerationRequest) -> GenerationResult:
         width, height, mode = resolve_generation_size(request.width, request.height, self._model)
 
@@ -77,7 +79,10 @@ class LeonardoProvider(ImageGenerationProvider):
             if init_image_id:
                 payload["parameters"]["guidances"] = {
                     "image_reference": [
-                        {"image": {"id": init_image_id, "type": "UPLOADED"}, "strength": "MID"}
+                        {
+                            "image": {"id": init_image_id, "type": "UPLOADED"},
+                            "strength": request.reference_strength.upper(),
+                        }
                     ]
                 }
             url = f"{self.BASE_URL}/v2/generations"
@@ -91,8 +96,14 @@ class LeonardoProvider(ImageGenerationProvider):
                 "num_images": request.num_outputs,
             }
             if init_image_id:
-                payload["init_image_id"] = init_image_id
-                payload["init_strength"] = 0.55
+                payload["controlnets"] = [
+                    {
+                        "initImageId": init_image_id,
+                        "initImageType": "UPLOADED",
+                        "preprocessorId": self.STYLE_REFERENCE_PREPROCESSOR_ID,
+                        "strengthType": request.reference_strength,
+                    }
+                ]
             url = f"{self.BASE_URL}/v1/generations"
 
         return self._submit_and_poll(url, payload)

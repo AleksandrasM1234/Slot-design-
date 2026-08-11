@@ -19,16 +19,29 @@ const emptyAsset = {
   reference_image_path: null,
 };
 
+const STORAGE_KEY = "slot_asset_generator_state";
+
+function loadPersistedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
-  const [gameName, setGameName] = useState("");
-  const [artStyle, setArtStyle] = useState("");
-  const [palette, setPalette] = useState("");
-  const [assets, setAssets] = useState([]);
+  const persisted = loadPersistedState();
+
+  const [gameName, setGameName] = useState(persisted?.gameName ?? "");
+  const [artStyle, setArtStyle] = useState(persisted?.artStyle ?? "");
+  const [palette, setPalette] = useState(persisted?.palette ?? "");
+  const [assets, setAssets] = useState(persisted?.assets ?? []);
   const [savedThemeNames, setSavedThemeNames] = useState([]);
-  const [selectedThemeName, setSelectedThemeName] = useState("");
+  const [selectedThemeName, setSelectedThemeName] = useState(persisted?.selectedThemeName ?? "");
   const [imageModels, setImageModels] = useState([]);
   const [animationModels, setAnimationModels] = useState([]);
-  const [activeTab, setActiveTab] = useState("image");
+  const [activeTab, setActiveTab] = useState(persisted?.activeTab ?? "image");
   const [blueprints, setBlueprints] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
   const [frameworks, setFrameworks] = useState([]);
@@ -37,8 +50,9 @@ export default function App() {
   const [newFrameworkName, setNewFrameworkName] = useState("");
   const [newFrameworkDescription, setNewFrameworkDescription] = useState("");
   const [newFrameworkCounts, setNewFrameworkCounts] = useState({});
-  const [masterPrompt, setMasterPrompt] = useState("");
-  const [masterPromptEnhanced, setMasterPromptEnhanced] = useState("");
+  const [masterPrompt, setMasterPrompt] = useState(persisted?.masterPrompt ?? "");
+  const [masterPromptEnhanced, setMasterPromptEnhanced] = useState(persisted?.masterPromptEnhanced ?? "");
+  const [lastGeneratedPath, setLastGeneratedPath] = useState(persisted?.lastGeneratedPath ?? null);
   const [batchStatus, setBatchStatus] = useState(null);
 
   useEffect(() => {
@@ -47,6 +61,18 @@ export default function App() {
     refreshBlueprints();
     refreshFrameworks();
   }, []);
+
+  useEffect(() => {
+    const stateToSave = {
+      gameName, artStyle, palette, assets, selectedThemeName,
+      activeTab, masterPrompt, masterPromptEnhanced, lastGeneratedPath,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+  }, [gameName, artStyle, palette, assets, selectedThemeName, activeTab, masterPrompt, masterPromptEnhanced, lastGeneratedPath]);
+
+  const handleAssetDone = (path) => {
+    setLastGeneratedPath(path);
+  };
 
   const refreshModelList = async () => {
     const res = await fetch("http://localhost:8000/models");
@@ -84,17 +110,23 @@ export default function App() {
         blueprintKey: blueprint.key,
         num_outputs: blueprint.default_num_outputs,
         duration_seconds: blueprint.default_duration_seconds ?? 4,
+        reference_image_path: lastGeneratedPath,
       },
     ]);
     setShowPicker(false);
   };
 
   const loadFramework = (framework) => {
-    framework.blueprint_keys.forEach((key) => {
+    framework.blueprint_keys.forEach((entry) => {
+      const [key, explicitType] = entry.split(":");
       const blueprint = blueprints.find((b) => b.key === key);
       if (!blueprint) return;
-      const defaultType = blueprint.available_types.includes("image") ? "image" : "animation";
-      addAssetFromBlueprint(blueprint, defaultType);
+
+      let generationType = explicitType;
+      if (!generationType || !blueprint.available_types.includes(generationType)) {
+        generationType = blueprint.available_types.includes("image") ? "image" : "animation";
+      }
+      addAssetFromBlueprint(blueprint, generationType);
     });
     setShowFrameworkPicker(false);
   };
@@ -144,7 +176,7 @@ export default function App() {
 
   const deleteFramework = async (framework) => {
     const confirmed = window.confirm(
-     `Delete "${framework.display_name}"? This cannot be undone.`
+      `Delete "${framework.display_name}"? This cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -183,6 +215,7 @@ export default function App() {
       enhanced_prompt: a.enhanced_prompt || null,
       role_constant: a.role_constant || null,
       reference_image_path: a.reference_image_path || null,
+      reference_strength: a.reference_strength || "Mid",
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
         generation_type: a.generation_type,
@@ -251,52 +284,54 @@ export default function App() {
         is_animation: asset.generation_type === "animation",
         master_context: masterPromptEnhanced || masterPrompt || null,
       }),
-   });
-   const data = await res.json();
-   updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+    });
+    const data = await res.json();
+    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
   };
 
   const enhanceMasterPrompt = async () => {
     const res = await fetch("http://localhost:8000/prompts/enhance-master", {
-     method: "POST",
-     headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({
-       base_prompt: masterPrompt,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_prompt: masterPrompt,
         art_style: artStyle,
         palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-     }),
+      }),
     });
     const data = await res.json();
     setMasterPromptEnhanced(data.enhanced_prompt);
   };
-    const autoFillFromWorld = async () => {
-  const context = masterPromptEnhanced || masterPrompt;
-  if (!context) return;
 
-  for (let i = 0; i < assets.length; i++) {
-    const asset = assets[i];
-    if (asset.description.trim() !== "") continue;
+  const autoFillFromWorld = async () => {
+    const context = masterPromptEnhanced || masterPrompt;
+    if (!context) return;
 
-    const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
-    const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+    for (let i = 0; i < assets.length; i++) {
+      const asset = assets[i];
+      if (asset.description.trim() !== "") continue;
 
-    const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        role_display_name: roleName,
-        category: asset.category,
-        is_animation: asset.generation_type === "animation",
-        art_style: artStyle,
-        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-        master_context: context,
-      }),
-    });
-    const data = await res.json();
-    updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
-    updateAsset(i, "description", `(auto-filled from world) ${roleName}`);
-  }
-};
+      const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
+      const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+
+      const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role_display_name: roleName,
+          category: asset.category,
+          is_animation: asset.generation_type === "animation",
+          art_style: artStyle,
+          palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+          master_context: context,
+        }),
+      });
+      const data = await res.json();
+      updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
+      updateAsset(i, "description", `(auto-filled from world) ${roleName}`);
+    }
+  };
+
   const submitAsset = async (index) => {
     const assetForm = assets[index];
     const theme = buildThemePayload();
@@ -316,81 +351,81 @@ export default function App() {
   };
 
   const pollJobUntilDone = async (jobId) => {
-  while (true) {
-    const res = await fetch(`http://localhost:8000/assets/${jobId}`);
-    const data = await res.json();
-    if (data.status === "done" || data.status === "failed") return data;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-};
+    while (true) {
+      const res = await fetch(`http://localhost:8000/assets/${jobId}`);
+      const data = await res.json();
+      if (data.status === "done" || data.status === "failed") return data;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  };
 
-const generateAllAndDownload = async () => {
-  const readyAssets = assets
-    .map((asset, i) => ({ asset, i }))
-    .filter(({ asset }) => asset.model_id);
+  const generateAllAndDownload = async () => {
+    const readyAssets = assets
+      .map((asset, i) => ({ asset, i }))
+      .filter(({ asset }) => asset.model_id);
 
-  if (readyAssets.length === 0) {
-    alert("No assets have a model selected yet — open each card and pick a model first.");
-    return;
-  }
+    if (readyAssets.length === 0) {
+      alert("No assets have a model selected yet — open each card and pick a model first.");
+      return;
+    }
 
-  setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
+    setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
 
-  const jobIds = [];
-  for (const { i } of readyAssets) {
-    const jobId = await submitAsset(i);
-    jobIds.push(jobId);
-  }
+    const jobIds = [];
+    for (const { i } of readyAssets) {
+      const jobId = await submitAsset(i);
+      jobIds.push(jobId);
+    }
 
-  setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
+    setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
 
-  let doneCount = 0;
-  let failedCount = 0;
-  const finishedJobIds = [];
+    let doneCount = 0;
+    let failedCount = 0;
+    const finishedJobIds = [];
 
-  await Promise.all(
-    jobIds.map(async (jobId) => {
-      const result = await pollJobUntilDone(jobId);
-      if (result.status === "done") {
-        finishedJobIds.push(jobId);
-        doneCount++;
-      } else {
-        failedCount++;
-      }
-      setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
-    })
-  );
+    await Promise.all(
+      jobIds.map(async (jobId) => {
+        const result = await pollJobUntilDone(jobId);
+        if (result.status === "done") {
+          finishedJobIds.push(jobId);
+          doneCount++;
+        } else {
+          failedCount++;
+        }
+        setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
+      })
+    );
 
-  if (finishedJobIds.length === 0) {
+    if (finishedJobIds.length === 0) {
+      setBatchStatus(null);
+      alert("All generations failed — nothing to export.");
+      return;
+    }
+
+    setBatchStatus({ phase: "zipping", done: doneCount, total: jobIds.length, failed: failedCount });
+
+    const res = await fetch("http://localhost:8000/export/zip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_ids: finishedJobIds }),
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${gameName || "assets"}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
     setBatchStatus(null);
-    alert("All generations failed — nothing to export.");
-    return;
-  }
-
-  setBatchStatus({ phase: "zipping", done: doneCount, total: jobIds.length, failed: failedCount });
-
-  const res = await fetch("http://localhost:8000/export/zip", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_ids: finishedJobIds }),
-  });
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${gameName || "assets"}.zip`;
-  a.click();
-  URL.revokeObjectURL(url);
-
-  setBatchStatus(null);
-};
+  };
 
   const visibleAssets = assets
     .map((asset, originalIndex) => ({ asset, originalIndex }))
     .filter(({ asset }) => asset.generation_type === activeTab);
 
-  return(
-      <div className="p-6 max-w-6xl mx-auto">
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -401,6 +436,7 @@ const generateAllAndDownload = async () => {
         <input className="border rounded p-2 col-span-2" placeholder="Palette, comma separated"
           value={palette} onChange={(e) => setPalette(e.target.value)} />
       </div>
+
       <div className="border rounded p-3 mb-4 bg-gray-50">
         <label className="text-sm font-semibold block mb-1">Game world / story (optional)</label>
         <textarea className="border rounded p-2 w-full mb-2" rows={2}
@@ -420,7 +456,8 @@ const generateAllAndDownload = async () => {
             Auto-fill empty blocks from world ✨
           </button>
         )}
-        </div>
+      </div>
+
       <div className="flex gap-2 items-center mb-4">
         <select
           className="border rounded p-2 flex-1"
@@ -463,36 +500,47 @@ const generateAllAndDownload = async () => {
         <button className="border rounded p-2 bg-gray-200" onClick={() => setShowPicker(true)}>
           + Add block
         </button>
-  <button className="border rounded p-2 bg-gray-200" onClick={() => setShowFrameworkPicker(true)}>
-    Load framework
-  </button>
-  <button className="border rounded p-2 bg-gray-200" onClick={() => setShowCreateFramework(true)}>
-    + Create framework
-  </button>
-  <label className="border rounded p-2 bg-gray-200 cursor-pointer">
-    Import framework
-    <input type="file" accept="application/json" className="hidden"
-      onChange={(e) => {
-        const file = e.target.files[0];
-        if (file) importFramework(file);
-      }} />
-  </label>
-  <button
-    className="border rounded p-2 bg-green-600 text-white disabled:opacity-50"
-    onClick={generateAllAndDownload}
-    disabled={batchStatus !== null || assets.length === 0}
-  >
-    {batchStatus ? "Generating..." : "Generate All & Download ZIP"}
-  </button>
-  {batchStatus && (
-    <span className="text-sm text-gray-500">
-      {batchStatus.phase === "submitting" && `Submitting ${batchStatus.total} jobs...`}
-      {batchStatus.phase === "waiting" &&
-        `${batchStatus.done + batchStatus.failed}/${batchStatus.total} finished (${batchStatus.failed} failed)`}
-      {batchStatus.phase === "zipping" && "Building ZIP..."}
-    </span>
-  )}
-</div>
+        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowFrameworkPicker(true)}>
+          Load framework
+        </button>
+        <button className="border rounded p-2 bg-gray-200" onClick={() => setShowCreateFramework(true)}>
+          + Create framework
+        </button>
+        <label className="border rounded p-2 bg-gray-200 cursor-pointer">
+          Import framework
+          <input type="file" accept="application/json" className="hidden"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) importFramework(file);
+            }} />
+        </label>
+        <button
+          className="border rounded p-2 bg-green-600 text-white disabled:opacity-50"
+          onClick={generateAllAndDownload}
+          disabled={batchStatus !== null || assets.length === 0}
+        >
+          {batchStatus ? "Generating..." : "Generate All & Download ZIP"}
+        </button>
+        {batchStatus && (
+          <span className="text-sm text-gray-500">
+            {batchStatus.phase === "submitting" && `Submitting ${batchStatus.total} jobs...`}
+            {batchStatus.phase === "waiting" &&
+              `${batchStatus.done + batchStatus.failed}/${batchStatus.total} finished (${batchStatus.failed} failed)`}
+            {batchStatus.phase === "zipping" && "Building ZIP..."}
+          </span>
+        )}
+        <button
+          className="border rounded p-2 bg-red-100 text-red-700 text-sm"
+          onClick={() => {
+            if (window.confirm("Clear all current work? This cannot be undone.")) {
+              localStorage.removeItem(STORAGE_KEY);
+              window.location.reload();
+            }
+          }}
+        >
+          Clear session
+        </button>
+      </div>
 
       {showPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -545,7 +593,7 @@ const generateAllAndDownload = async () => {
                     <div className="font-semibold">{f.display_name}</div>
                     <div className="text-sm text-gray-500">{f.description}</div>
                     <div className="text-xs text-gray-400 mt-1">
-                    {f.blueprint_keys.length} blocks {f.is_builtin && "· built-in"}
+                      {f.blueprint_keys.length} blocks {f.is_builtin && "· built-in"}
                     </div>
                   </button>
                   <div className="flex flex-col gap-1 items-end">
@@ -616,6 +664,7 @@ const generateAllAndDownload = async () => {
             submitAsset={submitAsset}
             imageModels={imageModels}
             animationModels={animationModels}
+            onAssetDone={handleAssetDone}
           />
         ))}
       </div>
