@@ -18,6 +18,7 @@ class AssetRequest(BaseModel):
     role_constant: str | None = None
     reference_image_path: str | None = None
     reference_strength: str = "Mid"
+    chroma_color: str = "green"
     settings: GenerationSettingsRequest = GenerationSettingsRequest()
 
 
@@ -57,6 +58,7 @@ class EnhanceMasterPromptRequest(BaseModel):
 
 class EnhancePromptResponse(BaseModel):
     enhanced_prompt: str
+    chroma_color: str = "green"
 
 
 class SaveFrameworkRequest(BaseModel):

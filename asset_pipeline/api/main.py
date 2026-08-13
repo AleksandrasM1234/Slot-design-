@@ -62,23 +62,33 @@ API_KEYS_BY_PROVIDER = {
 }
 
 
-def build_pipeline(model_id: str, target_width: int, target_height: int) -> AssetGenerationPipeline:
+def build_pipeline(model_id: str, target_width: int, target_height: int,
+                    chroma_color: str = "green") -> AssetGenerationPipeline:
     model_option = find_model(model_id)
     api_key = API_KEYS_BY_PROVIDER[model_option.provider]
     provider = GenerationProviderFactory.create(model_option.provider, api_key=api_key, model=model_option)
-    frame_pipeline = build_frame_pipeline(PostProcessingConfig(), target_width, target_height)
+    frame_pipeline = build_frame_pipeline(
+        PostProcessingConfig(chroma=chroma_color), target_width, target_height
+    )
     return AssetGenerationPipeline(LeonardoPromptBuilder(), provider, frame_pipeline)
 
 
 @app.post("/assets")
 async def create_asset(payload: CreateAssetRequest, background_tasks: BackgroundTasks):
     theme = theme_from_request(payload.theme)
-    asset = next(a for a in theme.assets if a.name == payload.asset_name)
+    matching = [a for a in theme.assets if a.name == payload.asset_name]
+    print(f"[DEBUG] asset_name={payload.asset_name!r}, matches found={len(matching)}")
+    for a in matching:
+        print(f"[DEBUG]   candidate: name={a.name!r}, type={a.settings.generation_type}, "
+              f"reference_image_path={a.reference_image_path!r}")
+    asset = matching[0]
 
     job = AssetJob(asset_name=asset.name, theme_name=theme.name)
     repository.save(job)
 
-    pipeline = build_pipeline(payload.model_id, asset.settings.width, asset.settings.height)
+    pipeline = build_pipeline(
+    payload.model_id, asset.settings.width, asset.settings.height, asset.chroma_color
+    )
     runner = AssetJobRunner(pipeline, repository, broadcaster)
     background_tasks.add_task(runner.run, job, theme, asset)
 
@@ -223,7 +233,7 @@ async def upload_reference_image(file: UploadFile = File(...)):
 @app.post("/prompts/enhance", response_model=EnhancePromptResponse)
 def enhance_prompt(payload: EnhancePromptRequest):
     enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
-    enhanced = enhancer.enhance(
+    enhanced, chroma_color = enhancer.enhance(
         payload.base_prompt,
         payload.art_style,
         payload.palette,
@@ -233,7 +243,7 @@ def enhance_prompt(payload: EnhancePromptRequest):
         role_constant=payload.role_constant,
         has_reference_image=payload.has_reference_image,
     )
-    return EnhancePromptResponse(enhanced_prompt=enhanced)
+    return EnhancePromptResponse(enhanced_prompt=enhanced, chroma_color=chroma_color)
 
 
 @app.post("/prompts/enhance-master", response_model=EnhancePromptResponse)
@@ -285,7 +295,7 @@ def delete_framework(key: str):
 @app.post("/prompts/generate-from-world", response_model=EnhancePromptResponse)
 def generate_from_world(payload: GenerateFromWorldRequest):
     enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
-    generated = enhancer.generate_from_world(
+    generated, chroma_color = enhancer.generate_from_world(
         payload.role_display_name,
         payload.master_context,
         payload.art_style,
@@ -293,7 +303,7 @@ def generate_from_world(payload: GenerateFromWorldRequest):
         is_animation=payload.is_animation,
         needs_isolation=category_needs_isolation(payload.category),
     )
-    return EnhancePromptResponse(enhanced_prompt=generated)
+    return EnhancePromptResponse(enhanced_prompt=generated, chroma_color=chroma_color)
 
 @app.get("/assets/{job_id}")
 def get_asset(job_id: str):

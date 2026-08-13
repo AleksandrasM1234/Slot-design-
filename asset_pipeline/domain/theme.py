@@ -42,6 +42,7 @@ class AssetSpec:
     role_constant: str | None = None
     reference_image_path: str | None = None
     reference_strength: str = "Mid"
+    chroma_color: str = "green"
 
 @dataclass(frozen=True)
 class Theme:

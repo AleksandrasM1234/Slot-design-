@@ -17,6 +17,7 @@ const emptyAsset = {
   role_constant: null,
   blueprintKey: null,
   reference_image_path: null,
+  chroma_color: "green",
 };
 
 const STORAGE_KEY = "slot_asset_generator_state";
@@ -54,6 +55,7 @@ export default function App() {
   const [masterPromptEnhanced, setMasterPromptEnhanced] = useState(persisted?.masterPromptEnhanced ?? "");
   const [lastGeneratedPath, setLastGeneratedPath] = useState(persisted?.lastGeneratedPath ?? null);
   const [batchStatus, setBatchStatus] = useState(null);
+  const [showDownloadPicker, setShowDownloadPicker] = useState(false);
 
   useEffect(() => {
     refreshThemeList();
@@ -216,6 +218,7 @@ export default function App() {
       role_constant: a.role_constant || null,
       reference_image_path: a.reference_image_path || null,
       reference_strength: a.reference_strength || "Mid",
+      chroma_color: a.chroma_color || "green",
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
         generation_type: a.generation_type,
@@ -289,6 +292,7 @@ export default function App() {
     });
     const data = await res.json();
     updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+    updateAsset(index, "chroma_color", data.chroma_color);
   };
 
   const enhanceMasterPrompt = async () => {
@@ -306,15 +310,37 @@ export default function App() {
   };
 
   const autoFillFromWorld = async () => {
-    const context = masterPromptEnhanced || masterPrompt;
-    if (!context) return;
+  const context = masterPromptEnhanced || masterPrompt;
+  if (!context) return;
 
-    for (let i = 0; i < assets.length; i++) {
-      const asset = assets[i];
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
+    const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
 
-      const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
-      const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+    const hasOwnDescription =
+      asset.description.trim() !== "" &&
+      !asset.description.startsWith("(auto-filled from world)");
 
+    if (hasOwnDescription) {
+      const res = await fetch("http://localhost:8000/prompts/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          base_prompt: asset.description,
+          art_style: artStyle,
+          palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+          category: asset.category,
+          is_animation: asset.generation_type === "animation",
+          master_context: context,
+          role_constant: asset.role_constant || null,
+          has_reference_image: Boolean(asset.reference_image_path),
+        }),
+      });
+      const data = await res.json();
+      updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
+      updateAsset(i, "chroma_color", data.chroma_color);
+    } else {
       const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -330,8 +356,10 @@ export default function App() {
       const data = await res.json();
       updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
       updateAsset(i, "description", `(auto-filled from world) ${roleName}`);
+      updateAsset(i, "chroma_color", data.chroma_color);
     }
-  };
+  }
+};
 
   const submitAsset = async (index) => {
     const assetForm = assets[index];
@@ -360,66 +388,74 @@ export default function App() {
     }
   };
 
-  const generateAllAndDownload = async () => {
-    const readyAssets = assets
-      .map((asset, i) => ({ asset, i }))
-      .filter(({ asset }) => asset.model_id);
+  const generateAll = async () => {
+  const readyAssets = assets
+    .map((asset, i) => ({ asset, i }))
+    .filter(({ asset }) => asset.model_id);
 
-    if (readyAssets.length === 0) {
-      alert("No assets have a model selected yet — open each card and pick a model first.");
-      return;
-    }
+  if (readyAssets.length === 0) {
+    alert("No assets have a model selected yet — open each card and pick a model first.");
+    return;
+  }
 
-    setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
+  setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
 
-    const jobIds = [];
-    for (const { i } of readyAssets) {
-      const jobId = await submitAsset(i);
-      jobIds.push(jobId);
-    }
+  const jobIds = [];
+  for (const { i } of readyAssets) {
+    const jobId = await submitAsset(i);
+    jobIds.push(jobId);
+  }
 
-    setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
+  setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
 
-    let doneCount = 0;
-    let failedCount = 0;
-    const finishedJobIds = [];
+  let doneCount = 0;
+  let failedCount = 0;
 
-    await Promise.all(
-      jobIds.map(async (jobId) => {
-        const result = await pollJobUntilDone(jobId);
-        if (result.status === "done") {
-          finishedJobIds.push(jobId);
-          doneCount++;
-        } else {
-          failedCount++;
-        }
-        setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
-      })
-    );
+  await Promise.all(
+    jobIds.map(async (jobId) => {
+      const result = await pollJobUntilDone(jobId);
+      if (result.status === "done") {
+        doneCount++;
+      } else {
+        failedCount++;
+      }
+      setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
+    })
+  );
 
-    if (finishedJobIds.length === 0) {
-      setBatchStatus(null);
-      alert("All generations failed — nothing to export.");
-      return;
-    }
+  setBatchStatus(null);
+};
 
-    setBatchStatus({ phase: "zipping", done: doneCount, total: jobIds.length, failed: failedCount });
+const downloadZip = async (scope) => {
+  let scoped = assets;
+  if (scope === "image") scoped = assets.filter((a) => a.generation_type === "image");
+  if (scope === "animation") scoped = assets.filter((a) => a.generation_type === "animation");
 
-    const res = await fetch("http://localhost:8000/export/zip", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_ids: finishedJobIds }),
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${gameName || "assets"}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const jobIds = scoped.map((a) => a.jobId).filter(Boolean);
 
-    setBatchStatus(null);
-  };
+  if (jobIds.length === 0) {
+    alert("No completed assets in this scope yet.");
+    return;
+  }
+
+  setShowDownloadPicker(false);
+  setBatchStatus({ phase: "zipping", done: 0, total: jobIds.length, failed: 0 });
+
+  const res = await fetch("http://localhost:8000/export/zip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_ids: jobIds }),
+  });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${gameName || "assets"}_${scope}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  setBatchStatus(null);
+};
 
   const visibleAssets = assets
     .map((asset, originalIndex) => ({ asset, originalIndex }))
@@ -452,10 +488,15 @@ export default function App() {
           </button>
         </div>
         {(masterPromptEnhanced || masterPrompt) && assets.length > 0 && (
-          <button className="border rounded p-2 bg-blue-500 text-white text-sm"
-            onClick={autoFillFromWorld}>
-            Auto-fill empty blocks from world ✨
-          </button>
+        <button className="border rounded p-2 bg-blue-500 text-white text-sm"
+          onClick={() => {
+            const confirmed = window.confirm(
+              "This will regenerate prompts for ALL blocks, overwriting anything you've already written. Continue?"
+            );
+            if (confirmed) autoFillFromWorld();
+          }}>
+          Regenerate all from world ✨
+        </button>
         )}
       </div>
 
@@ -517,10 +558,17 @@ export default function App() {
         </label>
         <button
           className="border rounded p-2 bg-green-600 text-white disabled:opacity-50"
-          onClick={generateAllAndDownload}
+          onClick={generateAll}
           disabled={batchStatus !== null || assets.length === 0}
         >
-          {batchStatus ? "Generating..." : "Generate All & Download ZIP"}
+          {batchStatus ? "Working..." : "Generate All"}
+        </button>
+        <button
+          className="border rounded p-2 bg-gray-700 text-white disabled:opacity-50"
+          onClick={() => setShowDownloadPicker(true)}
+          disabled={batchStatus !== null || assets.length === 0}
+        >
+          Download ZIP
         </button>
         {batchStatus && (
           <span className="text-sm text-gray-500">
@@ -653,7 +701,32 @@ export default function App() {
           </div>
         </div>
       )}
-
+      {showDownloadPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowDownloadPicker(false)}>
+        <div className="bg-white rounded-lg p-6 w-[30vw]"
+          onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Download ZIP</h3>
+            <button className="text-gray-500" onClick={() => setShowDownloadPicker(false)}>✕</button>
+          </div>
+          <div className="flex flex-col gap-2">
+              <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+              onClick={() => downloadZip("image")}>
+              All images
+            </button>
+            <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+              onClick={() => downloadZip("animation")}>
+              All animations
+            </button>
+            <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+              onClick={() => downloadZip("all")}>
+              Everything
+            </button>
+          </div>
+        </div>  
+      </div>
+      )}
       <div className="grid grid-cols-6 gap-3">
         {visibleAssets.map(({ asset, originalIndex }) => (
           <AssetCard

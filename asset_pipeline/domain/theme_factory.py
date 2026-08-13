@@ -14,6 +14,7 @@ def theme_from_request(theme_request) -> Theme:
             role_constant=a.role_constant,
             reference_image_path=a.reference_image_path,
             reference_strength=getattr(a, "reference_strength", "Mid"),
+            chroma_color=getattr(a, "chroma_color", "green"),
             settings=GenerationSettings(
                 generation_type=GenerationType(a.settings.generation_type),
                 width=a.settings.width,

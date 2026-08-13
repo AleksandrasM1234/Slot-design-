@@ -4,13 +4,26 @@ from groq import Groq
 
 BACKGROUND_CATEGORIES = {"background", "background_character"}
 
+GREEN_KEYWORDS = (
+    "green", "emerald", "jade", "olive", "lime", "forest", "mint",
+    "sage", "chartreuse", "moss", "viridian",
+)
+
+
+def detect_chroma_color(text: str) -> str:
+    lowered = text.lower()
+    if any(keyword in lowered for keyword in GREEN_KEYWORDS):
+        return "magenta"
+    return "green"
+
 
 class PromptEnhancer(ABC):
 
     @abstractmethod
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
-                master_context: str | None = None, role_constant: str | None = None, has_reference_image: bool = False) -> str:
+                master_context: str | None = None, role_constant: str | None = None,
+                has_reference_image: bool = False) -> tuple[str, str]:
         ...
 
     @abstractmethod
@@ -20,7 +33,7 @@ class PromptEnhancer(ABC):
     @abstractmethod
     def generate_from_world(self, role_display_name: str, master_context: str,
                              art_style: str, palette: list[str],
-                             is_animation: bool = False, needs_isolation: bool = True) -> str:
+                             is_animation: bool = False, needs_isolation: bool = True) -> tuple[str, str]:
         ...
 
 
@@ -43,9 +56,13 @@ class GroqPromptEnhancer(PromptEnhancer):
         return response.choices[0].message.content.strip()
 
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
-            is_animation: bool = False, needs_isolation: bool = True,
-            master_context: str | None = None, role_constant: str | None = None, has_reference_image: bool = False) -> str:
+                is_animation: bool = False, needs_isolation: bool = True,
+                master_context: str | None = None, role_constant: str | None = None,
+                has_reference_image: bool = False) -> tuple[str, str]:
         style_context = ", ".join(palette)
+
+        chroma_color = detect_chroma_color(f"{base_prompt} {master_context or ''} {role_constant or ''}")
+        chroma_hex = "#FF00FF" if chroma_color == "magenta" else "#00FF00"
 
         style_rules = (
             "You are an expert AI Prompt Engineer for slot game assets. Your job is to take "
@@ -55,7 +72,7 @@ class GroqPromptEnhancer(PromptEnhancer):
         if role_constant:
             style_rules += (
                 f"ASSET IDENTITY (highest priority — never violate this): {role_constant}\n\n"
-            )   
+            )
 
         if master_context:
             style_rules += (
@@ -68,11 +85,11 @@ class GroqPromptEnhancer(PromptEnhancer):
 
         if needs_isolation:
             style_rules += (
-                "1. CHROMAKEY BACKGROUND: The subject must ALWAYS be isolated on a flat, solid, "
-                "vibrant chroma key green background (use terms like: 'solid chroma key green "
-                "background, hex #00FF00, flat green screen, even studio lighting with no shadows "
-                "on the background'). State this requirement in two different phrasings, not just "
-                "once.\n"
+                f"1. CHROMAKEY BACKGROUND: The subject must ALWAYS be isolated on a flat, solid, "
+                f"vibrant chroma key {chroma_color} background (use terms like: 'solid chroma key "
+                f"{chroma_color} background, hex {chroma_hex}, flat {chroma_color} screen, even "
+                f"studio lighting with no shadows on the background'). State this requirement in "
+                f"two different phrasings, not just once.\n"
                 "2. NO CONTACT SHADOWS: Describe the subject as floating in space rather than "
                 "standing on a surface, to avoid ground-contact shadows anchoring it to a floor.\n"
                 "3. NO LIGHT SPILL: The subject must have zero glow, light bleed, or particle "
@@ -116,7 +133,6 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "12. NO LIGHT OR PARTICLE BLEED: Any glow, sparks, or particle effects must stay "
                 "tightly contained to the subject's silhouette and never spread onto or beyond the "
                 "background.\n"
-
             )
 
             if has_reference_image:
@@ -144,7 +160,8 @@ class GroqPromptEnhancer(PromptEnhancer):
             f"Art style: {art_style}. Color palette: {style_context}."
         )
 
-        return self._chat(style_rules, user_prompt, temperature=0.5)
+        enhanced_text = self._chat(style_rules, user_prompt, temperature=0.5)
+        return enhanced_text, chroma_color
 
     def enhance_master(self, base_prompt: str, art_style: str, palette: list[str]) -> str:
         style_context = ", ".join(palette)
@@ -166,8 +183,10 @@ class GroqPromptEnhancer(PromptEnhancer):
 
     def generate_from_world(self, role_display_name: str, master_context: str,
                              art_style: str, palette: list[str],
-                             is_animation: bool = False, needs_isolation: bool = True) -> str:
+                             is_animation: bool = False, needs_isolation: bool = True) -> tuple[str, str]:
         style_context = ", ".join(palette)
+
+        chroma_color = detect_chroma_color(f"{role_display_name} {master_context}")
 
         system_prompt = (
             f"You are an expert AI Prompt Engineer for slot game assets. Given a game's world "
@@ -181,8 +200,8 @@ class GroqPromptEnhancer(PromptEnhancer):
         if needs_isolation:
             system_prompt += (
                 "MANDATORY CONSTANTS:\n"
-                "1. CHROMAKEY BACKGROUND: isolated on a flat, solid, vibrant chroma key green "
-                "background, stated in two different phrasings.\n"
+                f"1. CHROMAKEY BACKGROUND: isolated on a flat, solid, vibrant chroma key "
+                f"{chroma_color} background, stated in two different phrasings.\n"
                 "2. NO CONTACT SHADOWS: describe as floating in space.\n"
                 "3. NO LIGHT SPILL: zero glow or particles extending beyond the subject's edges, "
                 "stated in two different phrasings.\n"
@@ -207,7 +226,7 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "only animating motion and effects around it, never morphing its form.\n"
                 "10. REWARDING ENERGY: if this represents a win or reward, make it vivid and "
                 "entertaining — dynamic motion, sparkle, pulsing light.\n"
-    )
+            )
         else:
             system_prompt += "8. STATIC POSE suited for sprite extraction.\n"
 
@@ -218,7 +237,8 @@ class GroqPromptEnhancer(PromptEnhancer):
 
         user_prompt = f"Generate the asset description for: {role_display_name}"
 
-        return self._chat(system_prompt, user_prompt, temperature=0.7)
+        generated_text = self._chat(system_prompt, user_prompt, temperature=0.7)
+        return generated_text, chroma_color
 
 
 def category_needs_isolation(category: str) -> bool:

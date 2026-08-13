@@ -462,7 +462,11 @@ export default function AssetCard({
             Enhance ✨
           </button>
         </div>
-
+        {asset.chroma_color === "magenta" && (
+          <div className="text-xs text-pink-600 mb-2">
+            Green detected in description — background switched to magenta chroma key
+          </div>
+        )}
         <div className="mb-2">
           <label className="text-sm text-gray-600 block mb-1">
             Reference image {asset.generation_type === "animation" ? "(first frame)" : "(style guide)"}

@@ -21,6 +21,7 @@ class GenerationResult:
     asset_urls: tuple[str, ...]
     provider_name: str
     raw_response: dict
+    is_video: bool = False
 
 
 class ImageGenerationProvider(ABC):

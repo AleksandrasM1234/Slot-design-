@@ -1,6 +1,8 @@
 import asyncio
 import os
 import shutil
+import traceback
+from asset_pipeline.domain import job
 from asset_pipeline.domain.job import AssetJob, JobStatus
 from asset_pipeline.domain.theme import Theme, AssetSpec
 from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
@@ -56,6 +58,8 @@ class AssetJobRunner:
         except Exception as exc:
             job.status = JobStatus.FAILED
             job.error = str(exc)
+            print(f"[job {job.id}] FAILED: {exc}")
+            traceback.print_exc()
         finally:
             self._repository.save(job)
             await self._broadcaster.notify(job)

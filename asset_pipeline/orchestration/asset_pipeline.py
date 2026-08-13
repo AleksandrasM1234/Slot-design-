@@ -2,6 +2,7 @@ import io
 import tempfile
 from dataclasses import dataclass
 from typing import Callable
+from unittest import result
 import requests
 import cv2
 import numpy as np
@@ -42,7 +43,9 @@ class AssetGenerationPipeline:
 
         notify("postprocessing")
 
-        if asset.settings.generation_type == GenerationType.ANIMATION:
+        notify("postprocessing")
+
+        if result.is_video:
             video_path, raw_frames = self._download_and_extract_frames(result.asset_urls[0])
             processed = [self._frame_pipeline.run(f) for f in raw_frames]
             return ProductionResult(video_path=video_path, raw_images=raw_frames, processed_images=processed)
