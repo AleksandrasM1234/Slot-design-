@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import AssetCard from "./AssetCard";
 
+const makeUniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 const emptyAsset = {
   name: "",
   category: "symbol",
@@ -18,6 +20,7 @@ const emptyAsset = {
   blueprintKey: null,
   reference_image_path: null,
   chroma_color: "green",
+  uniqueId: null,
 };
 
 const STORAGE_KEY = "slot_asset_generator_state";
@@ -33,11 +36,14 @@ function loadPersistedState() {
 
 export default function App() {
   const persisted = loadPersistedState();
+  const backfilledAssets = (persisted?.assets ?? []).map((a) =>
+    a.uniqueId ? a : { ...a, uniqueId: makeUniqueId() }
+  );
 
   const [gameName, setGameName] = useState(persisted?.gameName ?? "");
   const [artStyle, setArtStyle] = useState(persisted?.artStyle ?? "");
   const [palette, setPalette] = useState(persisted?.palette ?? "");
-  const [assets, setAssets] = useState(persisted?.assets ?? []);
+  const [assets, setAssets] = useState(backfilledAssets);
   const [savedThemeNames, setSavedThemeNames] = useState([]);
   const [selectedThemeName, setSelectedThemeName] = useState(persisted?.selectedThemeName ?? "");
   const [imageModels, setImageModels] = useState([]);
@@ -113,6 +119,7 @@ export default function App() {
         num_outputs: blueprint.default_num_outputs,
         duration_seconds: blueprint.default_duration_seconds ?? 4,
         reference_image_path: lastGeneratedPath,
+        uniqueId: makeUniqueId(),
       },
     ]);
     setShowPicker(false);
@@ -219,6 +226,7 @@ export default function App() {
       reference_image_path: a.reference_image_path || null,
       reference_strength: a.reference_strength || "Mid",
       chroma_color: a.chroma_color || "green",
+      unique_id: a.uniqueId,
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
         generation_type: a.generation_type,
@@ -260,6 +268,7 @@ export default function App() {
         description: a.description,
         enhanced_prompt: a.enhanced_prompt || "",
         role_constant: a.role_constant || null,
+        uniqueId: a.unique_id(),
         blueprintKey: null,
         reference_image_path: a.reference_image_path || null,
         style_keywords: a.style_keywords.join(", "),
@@ -371,6 +380,7 @@ export default function App() {
       body: JSON.stringify({
         theme,
         asset_name: assetForm.name,
+        unique_id: assetForm.uniqueId,
         model_id: assetForm.model_id,
       }),
     });

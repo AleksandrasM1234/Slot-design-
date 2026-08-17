@@ -13,8 +13,8 @@ from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 class AssetJobRunner:
 
     def __init__(self, pipeline: AssetGenerationPipeline,
-                 repository: JobRepository, broadcaster: JobEventBroadcaster,
-                 output_dir: str = "output"):
+             repository: JobRepository, broadcaster: JobEventBroadcaster,
+             output_dir: str = "data/output"):
         self._pipeline = pipeline
         self._repository = repository
         self._broadcaster = broadcaster

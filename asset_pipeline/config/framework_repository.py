@@ -21,7 +21,7 @@ class FrameworkRepository(ABC):
 
 class JsonFileFrameworkRepository(FrameworkRepository):
 
-    def __init__(self, directory: str = "custom_frameworks"):
+    def __init__(self, directory: str = "data/custom_frameworks"):
         self._directory = Path(directory)
         self._directory.mkdir(exist_ok=True)
 

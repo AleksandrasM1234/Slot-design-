@@ -1,2 +1,5 @@
 .env
 custom_frameworks/
+data/
+venv/
+__pycache__/

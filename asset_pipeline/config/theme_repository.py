@@ -21,7 +21,7 @@ class ThemeRepository(ABC):
 
 class JsonFileThemeRepository(ThemeRepository):
 
-    def __init__(self, directory: str = "themes"):
+    def __init__(self, directory: str = "data/themes"):
         self._directory = Path(directory)
         self._directory.mkdir(exist_ok=True)
 

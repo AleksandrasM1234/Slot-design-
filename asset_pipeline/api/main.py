@@ -12,7 +12,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, Up
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
-
+from asset_pipeline.config.paths import (
+    OUTPUT_DIR, REFERENCE_IMAGES_DIR, ensure_data_dirs
+)
 from asset_pipeline.api.schemas import (
     CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
     EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest, ExportZipRequest
@@ -47,10 +49,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs("output", exist_ok=True)
-os.makedirs("reference_images", exist_ok=True)
-app.mount("/output", StaticFiles(directory="output"), name="output")
-app.mount("/reference_images", StaticFiles(directory="reference_images"), name="reference_images")
+ensure_data_dirs()
+app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
+app.mount("/reference_images", StaticFiles(directory=REFERENCE_IMAGES_DIR), name="reference_images")
 
 repository = InMemoryJobRepository()
 broadcaster = JobEventBroadcaster()
@@ -76,13 +77,17 @@ def build_pipeline(model_id: str, target_width: int, target_height: int,
 @app.post("/assets")
 async def create_asset(payload: CreateAssetRequest, background_tasks: BackgroundTasks):
     theme = theme_from_request(payload.theme)
-    matching = [a for a in theme.assets if a.name == payload.asset_name]
-    print(f"[DEBUG] asset_name={payload.asset_name!r}, matches found={len(matching)}")
-    for a in matching:
-        print(f"[DEBUG]   candidate: name={a.name!r}, type={a.settings.generation_type}, "
-              f"reference_image_path={a.reference_image_path!r}")
-    asset = matching[0]
 
+    if payload.unique_id:
+        asset = next((a for a in theme.assets if a.unique_id == payload.unique_id), None)
+        if asset is None:
+            raise HTTPException(status_code=404, detail="Asset not found by unique_id.")
+    else:
+        matching = [a for a in theme.assets if a.name == payload.asset_name]
+        if not matching:
+            raise HTTPException(status_code=404, detail="Asset not found by name.")
+        asset = matching[0]
+        
     job = AssetJob(asset_name=asset.name, theme_name=theme.name)
     repository.save(job)
 
@@ -104,7 +109,7 @@ async def import_asset(
 ):
     extension = os.path.splitext(file.filename)[1] or ".png"
     filename = f"{uuid.uuid4()}{extension}"
-    path = f"output/{filename}"
+    path = f"{OUTPUT_DIR}/{filename}"
 
     contents = await file.read()
     with open(path, "wb") as f:
@@ -221,7 +226,7 @@ def save_framework(payload: SaveFrameworkRequest):
 async def upload_reference_image(file: UploadFile = File(...)):
     extension = os.path.splitext(file.filename)[1] or ".png"
     filename = f"{uuid.uuid4()}{extension}"
-    path = f"reference_images/{filename}"
+    path = f"{REFERENCE_IMAGES_DIR}/{filename}"
 
     contents = await file.read()
     with open(path, "wb") as f:
@@ -320,11 +325,11 @@ def get_asset(job_id: str):
 
 @app.get("/api/output-files")
 def list_output_files():
-    files = sorted(os.listdir("output"))
+    files = sorted(os.listdir(OUTPUT_DIR))
     return [
-        {"path": f"output/{f}", "filename": f}
+        {"path": f"{OUTPUT_DIR}/{f}", "filename": f}
         for f in files
-        if os.path.isfile(f"output/{f}")
+        if os.path.isfile(f"{OUTPUT_DIR}/{f}")
     ]
 
 @app.post("/assets/{job_id}/reprocess")

@@ -19,6 +19,7 @@ class AssetRequest(BaseModel):
     reference_image_path: str | None = None
     reference_strength: str = "Mid"
     chroma_color: str = "green"
+    unique_id: str | None = None
     settings: GenerationSettingsRequest = GenerationSettingsRequest()
 
 
@@ -35,6 +36,7 @@ class CreateAssetRequest(BaseModel):
     theme: ThemeRequest
     asset_name: str
     model_id: str
+    unique_id: str | None = None
 
 
 class SaveThemeRequest(BaseModel):
