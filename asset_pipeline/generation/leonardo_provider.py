@@ -59,6 +59,36 @@ class LeonardoProvider(ImageGenerationProvider):
 
         return image_id
 
+    def get_remaining_balance(self) -> dict:
+        response = requests.get(f"{self.BASE_URL}/v1/me", headers=self._headers)
+        response.raise_for_status()
+        data = response.json()
+
+        user_details = data.get("user_details", [{}])[0]
+        balance = user_details.get("apiPaidTokens", 0)
+
+        return {"balance_usd": balance}
+
+    def estimate_cost(self, model_id: str, service_type: str, num_images: int = 1,
+                   width: int | None = None, height: int | None = None) -> float | None:
+        payload = {
+            "serviceType": service_type,
+            "modelId": model_id,
+            "numImages": num_images,
+        }  
+        if width and height:
+            payload["width"] = width
+            payload["height"] = height
+
+        response = requests.post(
+            f"{self.BASE_URL}/v1/pricing-calculator",
+            json=payload,
+            headers=self._headers,
+        )
+        if not response.ok:
+            return None
+        data = response.json()
+        return data.get("calculateProductionApiServiceCost", {}).get("cost")
     # -------------------- image generation --------------------
 
     def _generate_image(self, request: GenerationRequest) -> GenerationResult:
@@ -201,7 +231,9 @@ class LeonardoProvider(ImageGenerationProvider):
                         f"Generation completed but no {'video' if expect_video else 'image'} "
                         f"URLs were found. Raw response: {data}"
                     )
-                return GenerationResult(asset_urls=urls, provider_name="leonardo", raw_response=data,is_video=expect_video)
+                cost = data.get("cost", {}).get("amount") if isinstance(data.get("cost"), dict) else None
+
+                return GenerationResult(asset_urls=urls, provider_name="leonardo", raw_response=data,is_video=expect_video, cost_usd=cost)
             if status == "FAILED":
                 raise RuntimeError(f"Leonardo generation failed: {data}")
 
@@ -213,3 +245,5 @@ class LeonardoProvider(ImageGenerationProvider):
             f"Video generations can take several minutes — if this keeps happening, "
             f"the timeout may need to be increased further."
         )
+
+    

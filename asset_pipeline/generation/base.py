@@ -22,6 +22,7 @@ class GenerationResult:
     provider_name: str
     raw_response: dict
     is_video: bool = False
+    cost_usd: float | None = None
 
 
 class ImageGenerationProvider(ABC):

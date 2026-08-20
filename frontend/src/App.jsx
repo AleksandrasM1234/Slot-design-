@@ -62,12 +62,19 @@ export default function App() {
   const [lastGeneratedPath, setLastGeneratedPath] = useState(persisted?.lastGeneratedPath ?? null);
   const [batchStatus, setBatchStatus] = useState(null);
   const [showDownloadPicker, setShowDownloadPicker] = useState(false);
+  const [leonardoBalance, setLeonardoBalance] = useState(null);
+  const [sessionCost, setSessionCost] = useState(0);
+  const [leonardoEstimatedUsd, setLeonardoEstimatedUsd] = useState(null);
 
   useEffect(() => {
     refreshThemeList();
     refreshModelList();
     refreshBlueprints();
     refreshFrameworks();
+    refreshBalance();
+
+  const interval = setInterval(refreshBalance, 60000);
+  return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -82,6 +89,19 @@ export default function App() {
     setLastGeneratedPath(path);
   };
 
+  const fixStalePaths = () => {
+    const fixPath = (p) => (p && p.startsWith("output/") ? p.replace("output/", "data/output/") : p);
+
+    setAssets((prev) =>
+      prev.map((a) => ({
+        ...a,
+        reference_image_path: fixPath(a.reference_image_path),
+      }))
+    );
+
+  alert("Fixed. Reload the page after this to re-check any already-generated results too.");
+};
+
   const refreshModelList = async () => {
     const res = await fetch("http://localhost:8000/models");
     const data = await res.json();
@@ -92,6 +112,26 @@ export default function App() {
   const refreshBlueprints = async () => {
     const res = await fetch("http://localhost:8000/blueprints");
     setBlueprints(await res.json());
+  };
+
+  const refreshBalance = async () => {
+    try {
+      const [balanceRes, sessionRes] = await Promise.all([
+        fetch("http://localhost:8000/leonardo/balance"),
+        fetch("http://localhost:8000/leonardo/session-cost"),
+      ]);
+      if (balanceRes.ok) {
+        const data = await balanceRes.json();
+        setLeonardoBalance(data.balance_usd);
+        setLeonardoEstimatedUsd(data.estimated_usd);
+      }
+      if (sessionRes.ok) {
+        const data = await sessionRes.json();
+        setSessionCost(data.total_usd);
+      }
+    } catch {
+    // ignore
+    }
   };
 
   const refreshFrameworks = async () => {
@@ -284,46 +324,62 @@ export default function App() {
   };
 
   const enhancePrompt = async (index) => {
-    const asset = assets[index];
-    const res = await fetch("http://localhost:8000/prompts/enhance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        base_prompt: asset.description,
-        art_style: artStyle,
-        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-        category: asset.category,
-        is_animation: asset.generation_type === "animation",
-        master_context: masterPromptEnhanced || masterPrompt || null,
-        role_constant: asset.role_constant || null,
-        has_reference_image: Boolean(asset.reference_image_path),
-      }),
-    });
-    const data = await res.json();
-    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
-    updateAsset(index, "chroma_color", data.chroma_color);
-  };
+  const asset = assets[index];
+  const res = await fetch("http://localhost:8000/prompts/enhance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      base_prompt: asset.description,
+      art_style: artStyle,
+      palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+      category: asset.category,
+      is_animation: asset.generation_type === "animation",
+      master_context: masterPromptEnhanced || masterPrompt || null,
+      role_constant: asset.role_constant || null,
+      has_reference_image: Boolean(asset.reference_image_path),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(`Enhance failed: ${data.detail || "unknown error"}`);
+    return;
+  }
+  updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+  updateAsset(index, "chroma_color", data.chroma_color);
+};
 
   const enhanceMasterPrompt = async () => {
-    const res = await fetch("http://localhost:8000/prompts/enhance-master", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        base_prompt: masterPrompt,
-        art_style: artStyle,
-        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-      }),
-    });
-    const data = await res.json();
-    setMasterPromptEnhanced(data.enhanced_prompt);
-  };
+  const res = await fetch("http://localhost:8000/prompts/enhance-master", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      base_prompt: masterPrompt,
+      art_style: artStyle,
+      palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(`Enhance failed: ${data.detail || "unknown error"}`);
+    return;
+  }
+  setMasterPromptEnhanced(data.enhanced_prompt);
+};
 
   const autoFillFromWorld = async () => {
   const context = masterPromptEnhanced || masterPrompt;
-  if (!context) return;
+  if (!context) {
+    alert("Write and/or enhance a game world description first.");
+    return;
+  }
 
-  for (let i = 0; i < assets.length; i++) {
-    const asset = assets[i];
+  const targetIds = assets.map((a) => a.uniqueId);
+
+  for (const id of targetIds) {
+    const currentIndex = assets.findIndex((a) => a.uniqueId === id);
+    if (currentIndex === -1) continue;
+
+    const asset = assets[currentIndex];
     const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
     const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
 
@@ -347,8 +403,15 @@ export default function App() {
         }),
       });
       const data = await res.json();
-      updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
-      updateAsset(i, "chroma_color", data.chroma_color);
+      if (!res.ok || !data.enhanced_prompt) {
+        console.warn(`Enhance returned no content for "${roleName}"`, data);
+        continue;
+      }
+      const idx = assets.findIndex((a) => a.uniqueId === id);
+      if (idx !== -1) {
+        updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+        updateAsset(idx, "chroma_color", data.chroma_color);
+      }
     } else {
       const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
         method: "POST",
@@ -363,11 +426,20 @@ export default function App() {
         }),
       });
       const data = await res.json();
-      updateAsset(i, "enhanced_prompt", data.enhanced_prompt);
-      updateAsset(i, "description", `(auto-filled from world) ${roleName}`);
-      updateAsset(i, "chroma_color", data.chroma_color);
+      if (!res.ok || !data.enhanced_prompt) {
+        console.warn(`Generation returned no content for "${roleName}"`, data);
+        continue;
+      }
+      const idx = assets.findIndex((a) => a.uniqueId === id);
+      if (idx !== -1) {
+        updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+        updateAsset(idx, "description", `(auto-filled from world) ${roleName}`);
+        updateAsset(idx, "chroma_color", data.chroma_color);
+      }
     }
   }
+
+  alert("Regeneration pass complete. Check the browser console for any blocks that returned empty content.");
 };
 
   const submitAsset = async (index) => {
@@ -474,7 +546,18 @@ const downloadZip = async (scope) => {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
-
+      <div className="text-sm text-gray-500 mb-4">
+        {leonardoEstimatedUsd !== null ? (
+          <>Leonardo balance (estimated): <span className="font-semibold">${leonardoEstimatedUsd.toFixed(2)}</span></>
+        ) : leonardoBalance !== null ? (
+          <>Leonardo credits: <span className="font-semibold">{leonardoBalance.toLocaleString()}</span> (generate once to calibrate $ estimate)</>
+        ) : null}
+        {" · "}Spent this session: <span className="font-semibold">${sessionCost.toFixed(2)}</span>
+        {" · "}
+        <a href="https://app.leonardo.ai/api-access" target="_blank" rel="noreferrer" className="underline">
+          Verify exact balance
+        </a>
+      </div>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <input className="border rounded p-2" placeholder="Game name"
           value={gameName} onChange={(e) => setGameName(e.target.value)} />
@@ -600,7 +683,12 @@ const downloadZip = async (scope) => {
           Clear session
         </button>
       </div>
-
+          <button
+            className="border rounded p-2 bg-yellow-100 text-yellow-800 text-sm"
+              onClick={fixStalePaths}
+            >
+              Fix stale output/ paths
+          </button>
       {showPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setShowPicker(false)}>

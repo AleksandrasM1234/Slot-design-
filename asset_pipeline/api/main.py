@@ -19,6 +19,9 @@ from asset_pipeline.api.schemas import (
     CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
     EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest, ExportZipRequest
 )
+from asset_pipeline.config.exchange_rate import record_observation, get_usd_per_credit
+from asset_pipeline.generation.leonardo_provider import LeonardoProvider
+from asset_pipeline.generation.model_catalog import IMAGE_MODELS
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
 from asset_pipeline.domain.theme import GenerationType
@@ -32,12 +35,13 @@ from asset_pipeline.generation.model_catalog import models_for_type, find_model
 from asset_pipeline.postprocessing.config import PostProcessingConfig
 from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline
 from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
-from asset_pipeline.orchestration.job_repository import InMemoryJobRepository
+from asset_pipeline.orchestration.job_repository import JsonFileJobRepository
 from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 from asset_pipeline.orchestration.job_runner import AssetJobRunner
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
 from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
 from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY
+
 
 app = FastAPI()
 
@@ -50,10 +54,10 @@ app.add_middleware(
 )
 
 ensure_data_dirs()
-app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
-app.mount("/reference_images", StaticFiles(directory=REFERENCE_IMAGES_DIR), name="reference_images")
+app.mount("/data/output", StaticFiles(directory=OUTPUT_DIR), name="output")
+app.mount("/data/reference_images", StaticFiles(directory=REFERENCE_IMAGES_DIR), name="reference_images")
 
-repository = InMemoryJobRepository()
+repository = JsonFileJobRepository()
 broadcaster = JobEventBroadcaster()
 theme_repository = JsonFileThemeRepository()
 framework_repository = JsonFileFrameworkRepository()
@@ -94,7 +98,14 @@ async def create_asset(payload: CreateAssetRequest, background_tasks: Background
     pipeline = build_pipeline(
     payload.model_id, asset.settings.width, asset.settings.height, asset.chroma_color
     )
-    runner = AssetJobRunner(pipeline, repository, broadcaster)
+    def check_credits():
+        provider = LeonardoProvider(api_key=LEONARDO_API_KEY, model=IMAGE_MODELS[0])
+        return provider.get_remaining_balance()["credits_remaining"]
+
+    runner = AssetJobRunner(
+    pipeline, repository, broadcaster,
+    credits_checker=check_credits, rate_tracker=record_observation,
+)
     background_tasks.add_task(runner.run, job, theme, asset)
 
     return {"job_id": job.id}
@@ -238,23 +249,29 @@ async def upload_reference_image(file: UploadFile = File(...)):
 @app.post("/prompts/enhance", response_model=EnhancePromptResponse)
 def enhance_prompt(payload: EnhancePromptRequest):
     enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
-    enhanced, chroma_color = enhancer.enhance(
-        payload.base_prompt,
-        payload.art_style,
-        payload.palette,
-        is_animation=payload.is_animation,
-        needs_isolation=category_needs_isolation(payload.category),
-        master_context=payload.master_context,
-        role_constant=payload.role_constant,
-        has_reference_image=payload.has_reference_image,
-    )
+    try:
+        enhanced, chroma_color = enhancer.enhance(
+            payload.base_prompt,
+            payload.art_style,
+            payload.palette,
+            is_animation=payload.is_animation,
+            needs_isolation=category_needs_isolation(payload.category),
+            master_context=payload.master_context,
+            role_constant=payload.role_constant,
+            has_reference_image=payload.has_reference_image,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Prompt enhancement failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=enhanced, chroma_color=chroma_color)
 
 
 @app.post("/prompts/enhance-master", response_model=EnhancePromptResponse)
 def enhance_master_prompt(payload: EnhanceMasterPromptRequest):
     enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
-    enhanced = enhancer.enhance_master(payload.base_prompt, payload.art_style, payload.palette)
+    try:
+        enhanced = enhancer.enhance_master(payload.base_prompt, payload.art_style, payload.palette)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Prompt enhancement failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=enhanced)
 
 @app.post("/themes")
@@ -274,6 +291,21 @@ def get_theme(name: str):
     theme = theme_repository.load(name)
     return theme_to_dict(theme)
 
+@app.get("/leonardo/balance")
+def get_leonardo_balance():
+    provider = LeonardoProvider(api_key=LEONARDO_API_KEY, model=IMAGE_MODELS[0])
+    try:
+        result = provider.get_remaining_balance()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not fetch Leonardo balance: {exc}")
+
+    rate = get_usd_per_credit()
+    result["estimated_usd"] = round(result["credits_remaining"] * rate, 2) if rate else None
+    return result
+@app.get("/leonardo/session-cost")
+def get_session_cost():
+    total = sum(j.cost_usd or 0 for j in repository.list_all())
+    return {"total_usd": round(total, 4)}
 
 @app.websocket("/ws/assets/{job_id}")
 async def asset_updates(websocket: WebSocket, job_id: str):
@@ -300,14 +332,17 @@ def delete_framework(key: str):
 @app.post("/prompts/generate-from-world", response_model=EnhancePromptResponse)
 def generate_from_world(payload: GenerateFromWorldRequest):
     enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
-    generated, chroma_color = enhancer.generate_from_world(
-        payload.role_display_name,
-        payload.master_context,
-        payload.art_style,
-        payload.palette,
-        is_animation=payload.is_animation,
-        needs_isolation=category_needs_isolation(payload.category),
-    )
+    try:
+        generated, chroma_color = enhancer.generate_from_world(
+            payload.role_display_name,
+            payload.master_context,
+            payload.art_style,
+            payload.palette,
+            is_animation=payload.is_animation,
+            needs_isolation=category_needs_isolation(payload.category),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Prompt generation failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=generated, chroma_color=chroma_color)
 
 @app.get("/assets/{job_id}")
@@ -331,6 +366,11 @@ def list_output_files():
         for f in files
         if os.path.isfile(f"{OUTPUT_DIR}/{f}")
     ]
+
+@app.get("/leonardo/session-cost")
+def get_session_cost():
+    total = sum(j.cost_usd or 0 for j in repository.list_all())
+    return {"total_usd": round(total, 4)}
 
 @app.post("/assets/{job_id}/reprocess")
 def reprocess_asset(job_id: str, payload: ReprocessRequest):

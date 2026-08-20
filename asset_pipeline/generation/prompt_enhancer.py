@@ -39,7 +39,7 @@ class PromptEnhancer(ABC):
 
 class GroqPromptEnhancer(PromptEnhancer):
 
-    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
+    def __init__(self, api_key: str, model: str = "openai/gpt-oss-20b"):
         self._client = Groq(api_key=api_key)
         self._model = model
 
@@ -51,9 +51,25 @@ class GroqPromptEnhancer(PromptEnhancer):
                 {"role": "user", "content": user_prompt},
             ],
             temperature=temperature,
-            max_tokens=250,
+            max_tokens=400,
+            reasoning_effort="low",
         )
-        return response.choices[0].message.content.strip()
+        content = (response.choices[0].message.content or "").strip()
+
+        if not content:
+            retry_response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt + "\n\nRespond with the prompt text only."},
+                ],
+                temperature=min(temperature + 0.2, 1.0),
+                max_tokens=400,
+                reasoning_effort="low",
+            )
+            content = (retry_response.choices[0].message.content or "").strip()
+
+        return content
 
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
@@ -133,6 +149,13 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "12. NO LIGHT OR PARTICLE BLEED: Any glow, sparks, or particle effects must stay "
                 "tightly contained to the subject's silhouette and never spread onto or beyond the "
                 "background.\n"
+                "13. FLAT 2D ASSET: This is a flat 2D game sprite, not a 3D render. Explicitly state "
+                "'flat 2D illustration, no depth, no parallax, no camera dolly or rotation'.\n"
+                "14. NO SHADOWS OR INCIDENTAL MOVEMENT: The subject itself must stay physically "
+                "static — no swaying, no idle sway, no background elements drifting, no shadows "
+                "appearing, moving, or flickering. The only motion allowed is the specific effect "
+                "described in the prompt (e.g. a glow pulsing, a spark trail) — nothing else in the "
+                "frame may move.\n"
             )
 
             if has_reference_image:
@@ -226,6 +249,11 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "only animating motion and effects around it, never morphing its form.\n"
                 "10. REWARDING ENERGY: if this represents a win or reward, make it vivid and "
                 "entertaining — dynamic motion, sparkle, pulsing light.\n"
+                "11. FLAT 2D, NO DEPTH: flat 2D game sprite, no 3D depth, no parallax, no camera "
+                "movement.\n"
+                "12. NO SHADOWS OR INCIDENTAL MOVEMENT: subject stays physically static — no sway, "
+                "no drifting background elements, no appearing/flickering shadows. Only the specific "
+                "described effect may move; nothing else in the frame.\n"
             )
         else:
             system_prompt += "8. STATIC POSE suited for sprite extraction.\n"
