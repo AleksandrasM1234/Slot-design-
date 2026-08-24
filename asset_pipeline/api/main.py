@@ -154,6 +154,11 @@ def _serialize_model(m):
         "step": m.step,
         "min_duration": m.min_duration,
         "max_duration": m.max_duration,
+        "reference_cost_usd": m.reference_cost_usd,
+        "reference_note": m.reference_note,
+        "reference_width": m.reference_width,
+        "reference_height": m.reference_height,
+        "reference_duration": m.reference_duration,
     }
 
 @app.post("/export/zip")
@@ -300,7 +305,7 @@ def get_leonardo_balance():
         raise HTTPException(status_code=502, detail=f"Could not fetch Leonardo balance: {exc}")
 
     rate = get_usd_per_credit()
-    result["estimated_usd"] = round(result["credits_remaining"] * rate, 2) if rate else None
+    result["estimated_usd"] = round(result["credits_remaining"] * rate, 2)
     return result
 @app.get("/leonardo/session-cost")
 def get_session_cost():

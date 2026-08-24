@@ -122,7 +122,7 @@ export default function App() {
       ]);
       if (balanceRes.ok) {
         const data = await balanceRes.json();
-        setLeonardoBalance(data.balance_usd);
+        setLeonardoBalance(data.credits_remaining);
         setLeonardoEstimatedUsd(data.estimated_usd);
       }
       if (sessionRes.ok) {
@@ -145,7 +145,7 @@ export default function App() {
     );
   };
 
-  const addAssetFromBlueprint = (blueprint, generationType) => {
+  const addAssetFromBlueprint = (blueprint, generationType, overrides={}) => {
     const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
     setAssets((prev) => [
       ...prev,
@@ -160,6 +160,9 @@ export default function App() {
         duration_seconds: blueprint.default_duration_seconds ?? 4,
         reference_image_path: lastGeneratedPath,
         uniqueId: makeUniqueId(),
+        model_id: overrides.model_id ?? "",
+        width: overrides.width ?? emptyAsset.width,
+        height: overrides.height ?? emptyAsset.height,
       },
     ]);
     setShowPicker(false);
@@ -167,18 +170,33 @@ export default function App() {
 
   const loadFramework = (framework) => {
     framework.blueprint_keys.forEach((entry) => {
-      const [key, explicitType] = entry.split(":");
-      const blueprint = blueprints.find((b) => b.key === key);
-      if (!blueprint) return;
+    let key, explicitType, overrides = {};
 
-      let generationType = explicitType;
-      if (!generationType || !blueprint.available_types.includes(generationType)) {
-        generationType = blueprint.available_types.includes("image") ? "image" : "animation";
-      }
-      addAssetFromBlueprint(blueprint, generationType);
-    });
-    setShowFrameworkPicker(false);
-  };
+    if (typeof entry === "string") {
+      [key, explicitType] = entry.split(":");
+    } else {
+      key = entry.key;
+      explicitType = entry.type;
+      overrides = {
+        model_id: entry.model_id,
+        width: entry.width,
+        height: entry.height,
+        duration_seconds: entry.duration_seconds,
+        num_outputs: entry.num_outputs,
+      };
+    }
+
+    const blueprint = blueprints.find((b) => b.key === key);
+    if (!blueprint) return;
+
+    let generationType = explicitType;
+    if (!generationType || !blueprint.available_types.includes(generationType)) {
+      generationType = blueprint.available_types.includes("image") ? "image" : "animation";
+    }
+    addAssetFromBlueprint(blueprint, generationType, overrides);
+  });
+  setShowFrameworkPicker(false);
+};
 
   const adjustFrameworkCount = (key, delta) => {
     setNewFrameworkCounts((prev) => {
@@ -470,6 +488,19 @@ export default function App() {
     }
   };
 
+const estimateAssetCost = (asset, imageModels, animationModels) => {
+  const modelOptions = asset.generation_type === "animation" ? animationModels : imageModels;
+  const model = modelOptions.find((m) => m.model_id === asset.model_id);
+  if (!model?.reference_cost_usd || !model.reference_width || !model.reference_height) return null;
+
+  const areaRatio = (asset.width * asset.height) / (model.reference_width * model.reference_height);
+  let cost = model.reference_cost_usd * areaRatio;
+  if (model.reference_duration && asset.duration_seconds) {
+    cost *= asset.duration_seconds / model.reference_duration;
+  }
+  return cost * (asset.num_outputs || 1);
+};
+
   const generateAll = async () => {
   const readyAssets = assets
     .map((asset, i) => ({ asset, i }))
@@ -479,6 +510,25 @@ export default function App() {
     alert("No assets have a model selected yet — open each card and pick a model first.");
     return;
   }
+
+  let totalEstimate = 0;
+  let missingEstimateCount = 0;
+  readyAssets.forEach(({ asset }) => {
+    const cost = estimateAssetCost(asset, imageModels, animationModels);
+    if (cost == null) {
+      missingEstimateCount++;
+    } else {
+      totalEstimate += cost;
+    }
+  });
+
+  const missingNote = missingEstimateCount > 0
+    ? `\n\n(${missingEstimateCount} asset(s) have no cost reference and aren't included in this total.)`
+    : "";
+  const confirmed = window.confirm(
+    `This will generate ${readyAssets.length} asset(s) for an estimated total of ~$${totalEstimate.toFixed(2)}.${missingNote}\n\nContinue?`
+  );
+  if (!confirmed) return;
 
   setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
 
@@ -547,9 +597,9 @@ const downloadZip = async (scope) => {
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
       <div className="text-sm text-gray-500 mb-4">
-        {leonardoEstimatedUsd !== null ? (
+        {typeof leonardoEstimatedUsd === "number" ? (
           <>Leonardo balance (estimated): <span className="font-semibold">${leonardoEstimatedUsd.toFixed(2)}</span></>
-        ) : leonardoBalance !== null ? (
+        ) : typeof leonardoBalance === "number" ? (
           <>Leonardo credits: <span className="font-semibold">{leonardoBalance.toLocaleString()}</span> (generate once to calibrate $ estimate)</>
         ) : null}
         {" · "}Spent this session: <span className="font-semibold">${sessionCost.toFixed(2)}</span>

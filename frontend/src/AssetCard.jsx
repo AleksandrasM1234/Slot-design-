@@ -48,6 +48,16 @@ const downloadFile = async (path, filename) => {
   URL.revokeObjectURL(url);
 };
 
+const estimateCost = (model, width, height, duration) => {
+  if (!model?.reference_cost_usd || !model.reference_width || !model.reference_height) return null;
+  const areaRatio = (width * height) / (model.reference_width * model.reference_height);
+  let cost = model.reference_cost_usd * areaRatio;
+  if (model.reference_duration && duration) {
+    cost *= duration / model.reference_duration;
+  }
+  return cost;
+};
+
 function ProgressBar({ status }) {
   if (status === "failed") {
     return <div className="text-red-500 text-xs font-semibold">Failed</div>;
@@ -462,11 +472,7 @@ export default function AssetCard({
             Enhance ✨
           </button>
         </div>
-        {asset.chroma_color === "magenta" && (
-          <div className="text-xs text-pink-600 mb-2">
-            Green detected in description — background switched to magenta chroma key
-          </div>
-        )}
+
         <div className="mb-2">
           <label className="text-sm text-gray-600 block mb-1">
             Reference image {asset.generation_type === "animation" ? "(first frame)" : "(style guide)"}
@@ -582,6 +588,17 @@ export default function AssetCard({
           </div>
         )}
 
+        {selectedModel && (
+          <div className="text-xs text-gray-400 mb-2">
+            {(() => {
+              const est = estimateCost(selectedModel, asset.width, asset.height, asset.duration_seconds);
+              return est != null
+                ? `~$${est.toFixed(3)} estimated (reference: ${selectedModel.reference_note})`
+                : "No cost reference available for this model";
+            })()}
+          </div>
+        )}
+
         <button
           className="border rounded p-2 bg-blue-500 text-white w-full mb-2"
           onClick={() => submitAsset(index)}
@@ -624,58 +641,59 @@ export default function AssetCard({
           <div className="mb-3">
             <div className="text-sm text-gray-500 mb-1">Full animation preview</div>
             <video src={`http://localhost:8000/${videoPath}`} controls loop autoPlay className="rounded w-full max-h-64" />
-              {resultPaths.length > 0 && (
-                <button
-                  type="button"
-                  className="border rounded px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 mt-2"
-                  onClick={() => setShowFrames((prev) => !prev)}
-                >
-                  {showFrames ? "Hide PNG sequence" : `View PNG sequence (${resultPaths.length} frames)`}
-                </button>
-              )}
-            </div>
-          )}
-
-          {resultPaths.length > 0 && (!videoPath || showFrames) && (
-            <div className="text-sm text-gray-500 mb-1">
-              {videoPath ? "Extracted frames (background removed)" : "Results"}
-            </div>
-          )}
-          {(!videoPath || showFrames) && (
-        <div className="grid grid-cols-3 gap-2">
-          {resultPaths.map((path, idx) => {
-            const extension = path.split(".").pop();
-            const filename = resultPaths.length > 1
-              ? `${asset.name || "asset"}_${idx}.${extension}`
-              : `${asset.name || "asset"}.${extension}`;
-
-            return (
-              <div key={path} className="relative group">
-                <img
-                  src={`http://localhost:8000/${path}?t=${asset.jobId}`}
-                  alt={asset.name}
-                  className="rounded w-full"
-                  style={CHECKERBOARD_STYLE}
-                />
-                <button
-                  type="button"
-                  className="absolute bottom-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
-                  onClick={() => downloadFile(path, filename)}
-                >
-                  ⬇ Download
-                </button>
-                <button
-                  type="button"
-                  className="absolute top-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
-                  onClick={() => setBgPanelIndex(idx)}
-                >
-                  ⚙ Background
-                </button>
-              </div>
-            );
-          })}
-        </div>
+            {resultPaths.length > 0 && (
+              <button
+                type="button"
+                className="border rounded px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 mt-2"
+                onClick={() => setShowFrames((prev) => !prev)}
+              >
+                {showFrames ? "Hide PNG sequence" : `View PNG sequence (${resultPaths.length} frames)`}
+              </button>
+            )}
+          </div>
         )}
+
+        {resultPaths.length > 0 && (!videoPath || showFrames) && (
+          <div className="text-sm text-gray-500 mb-1">
+            {videoPath ? "Extracted frames (background removed)" : "Results"}
+          </div>
+        )}
+        {(!videoPath || showFrames) && (
+          <div className="grid grid-cols-3 gap-2">
+            {resultPaths.map((path, idx) => {
+              const extension = path.split(".").pop();
+              const filename = resultPaths.length > 1
+                ? `${asset.name || "asset"}_${idx}.${extension}`
+                : `${asset.name || "asset"}.${extension}`;
+
+              return (
+                <div key={path} className="relative group">
+                  <img
+                    src={`http://localhost:8000/${path}?t=${asset.jobId}`}
+                    alt={asset.name}
+                    className="rounded w-full"
+                    style={CHECKERBOARD_STYLE}
+                  />
+                  <button
+                    type="button"
+                    className="absolute bottom-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
+                    onClick={() => downloadFile(path, filename)}
+                  >
+                    ⬇ Download
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 bg-black/70 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition"
+                    onClick={() => setBgPanelIndex(idx)}
+                  >
+                    ⚙ Background
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {bgPanelIndex !== null && (
           <BackgroundRemovalPanel
             jobId={asset.jobId}

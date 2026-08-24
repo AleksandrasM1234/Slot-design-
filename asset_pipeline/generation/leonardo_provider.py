@@ -65,9 +65,9 @@ class LeonardoProvider(ImageGenerationProvider):
         data = response.json()
 
         user_details = data.get("user_details", [{}])[0]
-        balance = user_details.get("apiPaidTokens", 0)
+        credits = user_details.get("apiPaidTokens", 0)
 
-        return {"balance_usd": balance}
+        return {"credits_remaining": credits}
 
     def estimate_cost(self, model_id: str, service_type: str, num_images: int = 1,
                    width: int | None = None, height: int | None = None) -> float | None:
