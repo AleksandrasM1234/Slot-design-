@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from asset_pipeline.domain import theme
 from asset_pipeline.domain.theme import Theme, AssetSpec
 from asset_pipeline.generation.base import GenerationRequest
 
@@ -33,9 +34,10 @@ class LeonardoPromptBuilder(PromptBuilder):
     def _assemble_prompt(theme: Theme, asset: AssetSpec) -> str:
         style = ", ".join(theme.palette)
         keywords = ", ".join(asset.style_keywords)
+        text_clause = f", the text \"{asset.text_content}\" clearly rendered" if asset.text_content else ""
         return (
-            f"{asset.description}, {theme.art_style}, "
-            f"color palette: {style}, {keywords}, "
-            f"solid flat background, centered composition, "
-            f"game asset, high detail, studio lighting"
-        )
+        f"{asset.description}, {theme.art_style}, "
+        f"color palette: {style}, {keywords}, "
+        f"solid flat background, centered composition, "
+        f"game asset, high detail, studio lighting{text_clause}"
+    )

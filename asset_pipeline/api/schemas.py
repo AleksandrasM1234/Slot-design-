@@ -20,6 +20,7 @@ class AssetRequest(BaseModel):
     reference_strength: str = "Mid"
     chroma_color: str = "green"
     unique_id: str | None = None
+    text_content: str | None = None
     settings: GenerationSettingsRequest = GenerationSettingsRequest()
 
 
@@ -52,6 +53,7 @@ class EnhancePromptRequest(BaseModel):
     master_context: str | None = None
     role_constant: str | None = None
     has_reference_image: bool = False
+    text_content: str | None = None
 
 class EnhanceMasterPromptRequest(BaseModel):
     base_prompt: str

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import AssetCard from "./AssetCard";
-
-const makeUniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+import OutOfCreditsModal from "./OutOfCreditsModal";
 
 const emptyAsset = {
   name: "",
@@ -19,9 +18,12 @@ const emptyAsset = {
   role_constant: null,
   blueprintKey: null,
   reference_image_path: null,
+  reference_strength: "Mid",
   chroma_color: "green",
   uniqueId: null,
 };
+
+const AUTO_REFERENCE_CATEGORIES = ["low_tier", "high_tier"];
 
 const STORAGE_KEY = "slot_asset_generator_state";
 
@@ -33,6 +35,21 @@ function loadPersistedState() {
     return null;
   }
 }
+
+const makeUniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+const estimateAssetCost = (asset, imageModels, animationModels) => {
+  const modelOptions = asset.generation_type === "animation" ? animationModels : imageModels;
+  const model = modelOptions.find((m) => m.model_id === asset.model_id);
+  if (!model?.reference_cost_usd || !model.reference_width || !model.reference_height) return null;
+
+  const areaRatio = (asset.width * asset.height) / (model.reference_width * model.reference_height);
+  let cost = model.reference_cost_usd * areaRatio;
+  if (model.reference_duration && asset.duration_seconds) {
+    cost *= asset.duration_seconds / model.reference_duration;
+  }
+  return cost * (asset.num_outputs || 1);
+};
 
 export default function App() {
   const persisted = loadPersistedState();
@@ -61,10 +78,11 @@ export default function App() {
   const [masterPromptEnhanced, setMasterPromptEnhanced] = useState(persisted?.masterPromptEnhanced ?? "");
   const [lastGeneratedPath, setLastGeneratedPath] = useState(persisted?.lastGeneratedPath ?? null);
   const [batchStatus, setBatchStatus] = useState(null);
-  const [showDownloadPicker, setShowDownloadPicker] = useState(false);
   const [leonardoBalance, setLeonardoBalance] = useState(null);
-  const [sessionCost, setSessionCost] = useState(0);
   const [leonardoEstimatedUsd, setLeonardoEstimatedUsd] = useState(null);
+  const [sessionCost, setSessionCost] = useState(0);
+  const [showDownloadPicker, setShowDownloadPicker] = useState(false);
+  const [outOfCreditsService, setOutOfCreditsService] = useState(null);
 
   useEffect(() => {
     refreshThemeList();
@@ -73,8 +91,8 @@ export default function App() {
     refreshFrameworks();
     refreshBalance();
 
-  const interval = setInterval(refreshBalance, 60000);
-  return () => clearInterval(interval);
+    const interval = setInterval(refreshBalance, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -85,33 +103,17 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   }, [gameName, artStyle, palette, assets, selectedThemeName, activeTab, masterPrompt, masterPromptEnhanced, lastGeneratedPath]);
 
-  const handleAssetDone = (path) => {
-    setLastGeneratedPath(path);
-  };
-
-  const fixStalePaths = () => {
-    const fixPath = (p) => (p && p.startsWith("output/") ? p.replace("output/", "data/output/") : p);
-
-    setAssets((prev) =>
-      prev.map((a) => ({
-        ...a,
-        reference_image_path: fixPath(a.reference_image_path),
-      }))
-    );
-
-  alert("Fixed. Reload the page after this to re-check any already-generated results too.");
-};
-
-  const refreshModelList = async () => {
-    const res = await fetch("http://localhost:8000/models");
-    const data = await res.json();
-    setImageModels(data.image);
-    setAnimationModels(data.animation);
-  };
-
-  const refreshBlueprints = async () => {
-    const res = await fetch("http://localhost:8000/blueprints");
-    setBlueprints(await res.json());
+  const checkForCreditsError = (message) => {
+    if (!message) return false;
+    if (message.includes("LEONARDO_OUT_OF_CREDITS")) {
+      setOutOfCreditsService("leonardo");
+      return true;
+    }
+    if (message.includes("GROQ_OUT_OF_CREDITS")) {
+      setOutOfCreditsService("groq");
+      return true;
+    }
+    return false;
   };
 
   const refreshBalance = async () => {
@@ -130,8 +132,34 @@ export default function App() {
         setSessionCost(data.total_usd);
       }
     } catch {
-    // ignore
+      // ignore
     }
+  };
+
+  const handleAssetDone = (path, category, blueprintKey) => {
+  if (AUTO_REFERENCE_CATEGORIES.includes(category) && blueprintKey) {
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.blueprintKey === blueprintKey &&
+        a.generation_type === "animation" &&
+        !a.reference_image_path
+          ? { ...a, reference_image_path: path }
+          : a
+      )
+    );
+  }
+};
+
+  const refreshModelList = async () => {
+    const res = await fetch("http://localhost:8000/models");
+    const data = await res.json();
+    setImageModels(data.image);
+    setAnimationModels(data.animation);
+  };
+
+  const refreshBlueprints = async () => {
+    const res = await fetch("http://localhost:8000/blueprints");
+    setBlueprints(await res.json());
   };
 
   const refreshFrameworks = async () => {
@@ -145,7 +173,7 @@ export default function App() {
     );
   };
 
-  const addAssetFromBlueprint = (blueprint, generationType, overrides={}) => {
+  const addAssetFromBlueprint = (blueprint, generationType, overrides = {}) => {
     const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
     setAssets((prev) => [
       ...prev,
@@ -156,13 +184,13 @@ export default function App() {
         generation_type: generationType,
         role_constant: blueprint.role_constant,
         blueprintKey: blueprint.key,
-        num_outputs: blueprint.default_num_outputs,
-        duration_seconds: blueprint.default_duration_seconds ?? 4,
-        reference_image_path: lastGeneratedPath,
-        uniqueId: makeUniqueId(),
+        num_outputs: overrides.num_outputs ?? blueprint.default_num_outputs,
+        duration_seconds: overrides.duration_seconds ?? blueprint.default_duration_seconds ?? 4,
+        reference_image_path: null,
         model_id: overrides.model_id ?? "",
         width: overrides.width ?? emptyAsset.width,
         height: overrides.height ?? emptyAsset.height,
+        uniqueId: makeUniqueId(),
       },
     ]);
     setShowPicker(false);
@@ -170,33 +198,33 @@ export default function App() {
 
   const loadFramework = (framework) => {
     framework.blueprint_keys.forEach((entry) => {
-    let key, explicitType, overrides = {};
+      let key, explicitType, overrides = {};
 
-    if (typeof entry === "string") {
-      [key, explicitType] = entry.split(":");
-    } else {
-      key = entry.key;
-      explicitType = entry.type;
-      overrides = {
-        model_id: entry.model_id,
-        width: entry.width,
-        height: entry.height,
-        duration_seconds: entry.duration_seconds,
-        num_outputs: entry.num_outputs,
-      };
-    }
+      if (typeof entry === "string") {
+        [key, explicitType] = entry.split(":");
+      } else {
+        key = entry.key;
+        explicitType = entry.type;
+        overrides = {
+          model_id: entry.model_id,
+          width: entry.width,
+          height: entry.height,
+          duration_seconds: entry.duration_seconds,
+          num_outputs: entry.num_outputs,
+        };
+      }
 
-    const blueprint = blueprints.find((b) => b.key === key);
-    if (!blueprint) return;
+      const blueprint = blueprints.find((b) => b.key === key);
+      if (!blueprint) return;
 
-    let generationType = explicitType;
-    if (!generationType || !blueprint.available_types.includes(generationType)) {
-      generationType = blueprint.available_types.includes("image") ? "image" : "animation";
-    }
-    addAssetFromBlueprint(blueprint, generationType, overrides);
-  });
-  setShowFrameworkPicker(false);
-};
+      let generationType = explicitType;
+      if (!generationType || !blueprint.available_types.includes(generationType)) {
+        generationType = blueprint.available_types.includes("image") ? "image" : "animation";
+      }
+      addAssetFromBlueprint(blueprint, generationType, overrides);
+    });
+    setShowFrameworkPicker(false);
+  };
 
   const adjustFrameworkCount = (key, delta) => {
     setNewFrameworkCounts((prev) => {
@@ -326,9 +354,10 @@ export default function App() {
         description: a.description,
         enhanced_prompt: a.enhanced_prompt || "",
         role_constant: a.role_constant || null,
-        uniqueId: a.unique_id(),
         blueprintKey: null,
         reference_image_path: a.reference_image_path || null,
+        reference_strength: a.reference_strength || "Mid",
+        chroma_color: a.chroma_color || "green",
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
         model_id: "",
@@ -337,128 +366,143 @@ export default function App() {
         duration_seconds: a.settings.duration_seconds ?? 4,
         num_outputs: a.settings.num_outputs,
         jobId: null,
+        uniqueId: makeUniqueId(),
       }))
     );
   };
 
   const enhancePrompt = async (index) => {
-  const asset = assets[index];
-  const res = await fetch("http://localhost:8000/prompts/enhance", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      base_prompt: asset.description,
-      art_style: artStyle,
-      palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-      category: asset.category,
-      is_animation: asset.generation_type === "animation",
-      master_context: masterPromptEnhanced || masterPrompt || null,
-      role_constant: asset.role_constant || null,
-      has_reference_image: Boolean(asset.reference_image_path),
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    alert(`Enhance failed: ${data.detail || "unknown error"}`);
-    return;
-  }
-  updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
-  updateAsset(index, "chroma_color", data.chroma_color);
-};
+    const asset = assets[index];
+    const res = await fetch("http://localhost:8000/prompts/enhance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_prompt: asset.description,
+        art_style: artStyle,
+        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+        category: asset.category,
+        is_animation: asset.generation_type === "animation",
+        master_context: masterPromptEnhanced || masterPrompt || null,
+        role_constant: asset.role_constant || null,
+        has_reference_image: Boolean(asset.reference_image_path),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (!checkForCreditsError(data.detail)) {
+        alert(`Enhance failed: ${data.detail || "unknown error"}`);
+      }
+      return;
+    }
+    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+    updateAsset(index, "chroma_color", data.chroma_color);
+  };
 
   const enhanceMasterPrompt = async () => {
-  const res = await fetch("http://localhost:8000/prompts/enhance-master", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      base_prompt: masterPrompt,
-      art_style: artStyle,
-      palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    alert(`Enhance failed: ${data.detail || "unknown error"}`);
-    return;
-  }
-  setMasterPromptEnhanced(data.enhanced_prompt);
-};
+    const res = await fetch("http://localhost:8000/prompts/enhance-master", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_prompt: masterPrompt,
+        art_style: artStyle,
+        palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (!checkForCreditsError(data.detail)) {
+        alert(`Enhance failed: ${data.detail || "unknown error"}`);
+      }
+      return;
+    }
+    setMasterPromptEnhanced(data.enhanced_prompt);
+  };
 
   const autoFillFromWorld = async () => {
-  const context = masterPromptEnhanced || masterPrompt;
-  if (!context) {
-    alert("Write and/or enhance a game world description first.");
-    return;
-  }
+    const context = masterPromptEnhanced || masterPrompt;
+    if (!context) {
+      alert("Write and/or enhance a game world description first.");
+      return;
+    }
 
-  const targetIds = assets.map((a) => a.uniqueId);
+    const targetIds = assets.map((a) => a.uniqueId);
 
-  for (const id of targetIds) {
-    const currentIndex = assets.findIndex((a) => a.uniqueId === id);
-    if (currentIndex === -1) continue;
+    for (const id of targetIds) {
+      const currentIndex = assets.findIndex((a) => a.uniqueId === id);
+      if (currentIndex === -1) continue;
 
-    const asset = assets[currentIndex];
-    const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
-    const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+      const asset = assets[currentIndex];
+      const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
+      const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
 
-    const hasOwnDescription =
-      asset.description.trim() !== "" &&
-      !asset.description.startsWith("(auto-filled from world)");
+      const hasOwnDescription =
+        asset.description.trim() !== "" &&
+        !asset.description.startsWith("(auto-filled from world)");
 
-    if (hasOwnDescription) {
-      const res = await fetch("http://localhost:8000/prompts/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_prompt: asset.description,
-          art_style: artStyle,
-          palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-          category: asset.category,
-          is_animation: asset.generation_type === "animation",
-          master_context: context,
-          role_constant: asset.role_constant || null,
-          has_reference_image: Boolean(asset.reference_image_path),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.enhanced_prompt) {
-        console.warn(`Enhance returned no content for "${roleName}"`, data);
-        continue;
-      }
-      const idx = assets.findIndex((a) => a.uniqueId === id);
-      if (idx !== -1) {
-        updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
-        updateAsset(idx, "chroma_color", data.chroma_color);
-      }
-    } else {
-      const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role_display_name: roleName,
-          category: asset.category,
-          is_animation: asset.generation_type === "animation",
-          art_style: artStyle,
-          palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
-          master_context: context,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.enhanced_prompt) {
-        console.warn(`Generation returned no content for "${roleName}"`, data);
-        continue;
-      }
-      const idx = assets.findIndex((a) => a.uniqueId === id);
-      if (idx !== -1) {
-        updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
-        updateAsset(idx, "description", `(auto-filled from world) ${roleName}`);
-        updateAsset(idx, "chroma_color", data.chroma_color);
+      if (hasOwnDescription) {
+        const res = await fetch("http://localhost:8000/prompts/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base_prompt: asset.description,
+            art_style: artStyle,
+            palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+            category: asset.category,
+            is_animation: asset.generation_type === "animation",
+            master_context: context,
+            role_constant: asset.role_constant || null,
+            has_reference_image: Boolean(asset.reference_image_path),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (checkForCreditsError(data.detail)) return;
+          console.warn(`Enhance failed for "${roleName}"`, data);
+          continue;
+        }
+        if (!data.enhanced_prompt) {
+          console.warn(`Enhance returned empty content for "${roleName}"`, data);
+          continue;
+        }
+        const idx = assets.findIndex((a) => a.uniqueId === id);
+        if (idx !== -1) {
+          updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+          updateAsset(idx, "chroma_color", data.chroma_color);
+        }
+      } else {
+        const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role_display_name: roleName,
+            category: asset.category,
+            is_animation: asset.generation_type === "animation",
+            art_style: artStyle,
+            palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
+            master_context: context,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (checkForCreditsError(data.detail)) return;
+          console.warn(`Generation failed for "${roleName}"`, data);
+          continue;
+        }
+        if (!data.enhanced_prompt) {
+          console.warn(`Generation returned empty content for "${roleName}"`, data);
+          continue;
+        }
+        const idx = assets.findIndex((a) => a.uniqueId === id);
+        if (idx !== -1) {
+          updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+          updateAsset(idx, "description", `(auto-filled from world) ${roleName}`);
+          updateAsset(idx, "chroma_color", data.chroma_color);
+        }
       }
     }
-  }
 
-  alert("Regeneration pass complete. Check the browser console for any blocks that returned empty content.");
-};
+    alert("Regeneration pass complete. Check the browser console for any blocks that returned empty content.");
+  };
 
   const submitAsset = async (index) => {
     const assetForm = assets[index];
@@ -488,106 +532,94 @@ export default function App() {
     }
   };
 
-const estimateAssetCost = (asset, imageModels, animationModels) => {
-  const modelOptions = asset.generation_type === "animation" ? animationModels : imageModels;
-  const model = modelOptions.find((m) => m.model_id === asset.model_id);
-  if (!model?.reference_cost_usd || !model.reference_width || !model.reference_height) return null;
-
-  const areaRatio = (asset.width * asset.height) / (model.reference_width * model.reference_height);
-  let cost = model.reference_cost_usd * areaRatio;
-  if (model.reference_duration && asset.duration_seconds) {
-    cost *= asset.duration_seconds / model.reference_duration;
-  }
-  return cost * (asset.num_outputs || 1);
-};
-
   const generateAll = async () => {
-  const readyAssets = assets
-    .map((asset, i) => ({ asset, i }))
-    .filter(({ asset }) => asset.model_id);
+    const readyAssets = assets
+      .map((asset, i) => ({ asset, i }))
+      .filter(({ asset }) => asset.model_id);
 
-  if (readyAssets.length === 0) {
-    alert("No assets have a model selected yet — open each card and pick a model first.");
-    return;
-  }
-
-  let totalEstimate = 0;
-  let missingEstimateCount = 0;
-  readyAssets.forEach(({ asset }) => {
-    const cost = estimateAssetCost(asset, imageModels, animationModels);
-    if (cost == null) {
-      missingEstimateCount++;
-    } else {
-      totalEstimate += cost;
+    if (readyAssets.length === 0) {
+      alert("No assets have a model selected yet — open each card and pick a model first.");
+      return;
     }
-  });
 
-  const missingNote = missingEstimateCount > 0
-    ? `\n\n(${missingEstimateCount} asset(s) have no cost reference and aren't included in this total.)`
-    : "";
-  const confirmed = window.confirm(
-    `This will generate ${readyAssets.length} asset(s) for an estimated total of ~$${totalEstimate.toFixed(2)}.${missingNote}\n\nContinue?`
-  );
-  if (!confirmed) return;
-
-  setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
-
-  const jobIds = [];
-  for (const { i } of readyAssets) {
-    const jobId = await submitAsset(i);
-    jobIds.push(jobId);
-  }
-
-  setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
-
-  let doneCount = 0;
-  let failedCount = 0;
-
-  await Promise.all(
-    jobIds.map(async (jobId) => {
-      const result = await pollJobUntilDone(jobId);
-      if (result.status === "done") {
-        doneCount++;
+    let totalEstimate = 0;
+    let missingEstimateCount = 0;
+    readyAssets.forEach(({ asset }) => {
+      const cost = estimateAssetCost(asset, imageModels, animationModels);
+      if (cost == null) {
+        missingEstimateCount++;
       } else {
-        failedCount++;
+        totalEstimate += cost;
       }
-      setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
-    })
-  );
+    });
 
-  setBatchStatus(null);
-};
+    const missingNote = missingEstimateCount > 0
+      ? `\n\n(${missingEstimateCount} asset(s) have no cost reference and aren't included in this total.)`
+      : "";
+    const confirmed = window.confirm(
+      `This will generate ${readyAssets.length} asset(s) for an estimated total of ~$${totalEstimate.toFixed(2)}.${missingNote}\n\nContinue?`
+    );
+    if (!confirmed) return;
 
-const downloadZip = async (scope) => {
-  let scoped = assets;
-  if (scope === "image") scoped = assets.filter((a) => a.generation_type === "image");
-  if (scope === "animation") scoped = assets.filter((a) => a.generation_type === "animation");
+    setBatchStatus({ phase: "submitting", done: 0, total: readyAssets.length, failed: 0 });
 
-  const jobIds = scoped.map((a) => a.jobId).filter(Boolean);
+    const jobIds = [];
+    for (const { i } of readyAssets) {
+      const jobId = await submitAsset(i);
+      jobIds.push(jobId);
+    }
 
-  if (jobIds.length === 0) {
-    alert("No completed assets in this scope yet.");
-    return;
-  }
+    setBatchStatus({ phase: "waiting", done: 0, total: jobIds.length, failed: 0 });
 
-  setShowDownloadPicker(false);
-  setBatchStatus({ phase: "zipping", done: 0, total: jobIds.length, failed: 0 });
+    let doneCount = 0;
+    let failedCount = 0;
 
-  const res = await fetch("http://localhost:8000/export/zip", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_ids: jobIds }),
-  });
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${gameName || "assets"}_${scope}.zip`;
-  a.click();
-  URL.revokeObjectURL(url);
+    await Promise.all(
+      jobIds.map(async (jobId) => {
+        const result = await pollJobUntilDone(jobId);
+        if (result.status === "done") {
+          doneCount++;
+        } else {
+          failedCount++;
+        }
+        setBatchStatus({ phase: "waiting", done: doneCount, total: jobIds.length, failed: failedCount });
+      })
+    );
 
-  setBatchStatus(null);
-};
+    setBatchStatus(null);
+    await refreshBalance();
+  };
+
+  const downloadZip = async (scope) => {
+    let scoped = assets;
+    if (scope === "image") scoped = assets.filter((a) => a.generation_type === "image");
+    if (scope === "animation") scoped = assets.filter((a) => a.generation_type === "animation");
+
+    const jobIds = scoped.map((a) => a.jobId).filter(Boolean);
+
+    if (jobIds.length === 0) {
+      alert("No completed assets in this scope yet.");
+      return;
+    }
+
+    setShowDownloadPicker(false);
+    setBatchStatus({ phase: "zipping", done: 0, total: jobIds.length, failed: 0 });
+
+    const res = await fetch("http://localhost:8000/export/zip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_ids: jobIds }),
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${gameName || "assets"}_${scope}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setBatchStatus(null);
+  };
 
   const visibleAssets = assets
     .map((asset, originalIndex) => ({ asset, originalIndex }))
@@ -596,6 +628,7 @@ const downloadZip = async (scope) => {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Slot Asset Generator</h1>
+
       <div className="text-sm text-gray-500 mb-4">
         {typeof leonardoEstimatedUsd === "number" ? (
           <>Leonardo balance (estimated): <span className="font-semibold">${leonardoEstimatedUsd.toFixed(2)}</span></>
@@ -608,6 +641,7 @@ const downloadZip = async (scope) => {
           Verify exact balance
         </a>
       </div>
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         <input className="border rounded p-2" placeholder="Game name"
           value={gameName} onChange={(e) => setGameName(e.target.value)} />
@@ -631,15 +665,15 @@ const downloadZip = async (scope) => {
           </button>
         </div>
         {(masterPromptEnhanced || masterPrompt) && assets.length > 0 && (
-        <button className="border rounded p-2 bg-blue-500 text-white text-sm"
-          onClick={() => {
-            const confirmed = window.confirm(
-              "This will regenerate prompts for ALL blocks, overwriting anything you've already written. Continue?"
-            );
-            if (confirmed) autoFillFromWorld();
-          }}>
-          Regenerate all from world ✨
-        </button>
+          <button className="border rounded p-2 bg-blue-500 text-white text-sm"
+            onClick={() => {
+              const confirmed = window.confirm(
+                "This will regenerate prompts for ALL blocks, overwriting anything you've already written. Continue?"
+              );
+              if (confirmed) autoFillFromWorld();
+            }}>
+            Regenerate all from world ✨
+          </button>
         )}
       </div>
 
@@ -733,12 +767,7 @@ const downloadZip = async (scope) => {
           Clear session
         </button>
       </div>
-          <button
-            className="border rounded p-2 bg-yellow-100 text-yellow-800 text-sm"
-              onClick={fixStalePaths}
-            >
-              Fix stale output/ paths
-          </button>
+
       {showPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setShowPicker(false)}>
@@ -849,36 +878,38 @@ const downloadZip = async (scope) => {
           </div>
         </div>
       )}
+
       {showDownloadPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setShowDownloadPicker(false)}>
-        <div className="bg-white rounded-lg p-6 w-[30vw]"
-          onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">Download ZIP</h3>
-            <button className="text-gray-500" onClick={() => setShowDownloadPicker(false)}>✕</button>
-          </div>
-          <div className="flex flex-col gap-2">
+          <div className="bg-white rounded-lg p-6 w-[30vw]"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Download ZIP</h3>
+              <button className="text-gray-500" onClick={() => setShowDownloadPicker(false)}>✕</button>
+            </div>
+            <div className="flex flex-col gap-2">
               <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
-              onClick={() => downloadZip("image")}>
-              All images
-            </button>
-            <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
-              onClick={() => downloadZip("animation")}>
-              All animations
-            </button>
-            <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
-              onClick={() => downloadZip("all")}>
-              Everything
-            </button>
+                onClick={() => downloadZip("image")}>
+                All images
+              </button>
+              <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+                onClick={() => downloadZip("animation")}>
+                All animations
+              </button>
+              <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+                onClick={() => downloadZip("all")}>
+                Everything
+              </button>
+            </div>
           </div>
-        </div>  
-      </div>
+        </div>
       )}
+
       <div className="grid grid-cols-6 gap-3">
         {visibleAssets.map(({ asset, originalIndex }) => (
           <AssetCard
-            key={originalIndex}
+            key={asset.uniqueId || originalIndex}
             asset={asset}
             index={originalIndex}
             updateAsset={updateAsset}
@@ -895,6 +926,13 @@ const downloadZip = async (scope) => {
         <div className="text-gray-400 text-sm mt-8 text-center">
           No {activeTab === "image" ? "image" : "animation"} assets yet — click "+ Add block" above.
         </div>
+      )}
+
+      {outOfCreditsService && (
+        <OutOfCreditsModal
+          service={outOfCreditsService}
+          onClose={() => setOutOfCreditsService(null)}
+        />
       )}
     </div>
   );

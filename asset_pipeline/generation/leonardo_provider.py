@@ -177,6 +177,9 @@ class LeonardoProvider(ImageGenerationProvider):
                       expect_video: bool = False) -> GenerationResult:
         response = requests.post(url, json=payload, headers=self._headers)
         if not response.ok:
+            body_lower = response.text.lower()
+            if response.status_code in (402, 403) or "insufficient" in body_lower or "credit" in body_lower:
+                raise RuntimeError(f"LEONARDO_OUT_OF_CREDITS: {response.text}")
             raise RuntimeError(
                 f"Leonardo rejected the generation request with status "
                 f"{response.status_code}: {response.text}"

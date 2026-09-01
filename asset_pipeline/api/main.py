@@ -264,10 +264,13 @@ def enhance_prompt(payload: EnhancePromptRequest):
             master_context=payload.master_context,
             role_constant=payload.role_constant,
             has_reference_image=payload.has_reference_image,
+            text_content=payload.text_content,
         )
     except Exception as exc:
+        error_text = str(exc).lower()
+        if "429" in error_text or "rate_limit" in error_text or "insufficient_quota" in error_text or "quota" in error_text:
+            raise HTTPException(status_code=429, detail=f"GROQ_OUT_OF_CREDITS: {exc}")
         raise HTTPException(status_code=502, detail=f"Prompt enhancement failed: {exc}")
-    return EnhancePromptResponse(enhanced_prompt=enhanced, chroma_color=chroma_color)
 
 
 @app.post("/prompts/enhance-master", response_model=EnhancePromptResponse)
@@ -276,6 +279,9 @@ def enhance_master_prompt(payload: EnhanceMasterPromptRequest):
     try:
         enhanced = enhancer.enhance_master(payload.base_prompt, payload.art_style, payload.palette)
     except Exception as exc:
+        error_text = str(exc).lower()
+        if "429" in error_text or "rate_limit" in error_text or "insufficient_quota" in error_text or "quota" in error_text:
+            raise HTTPException(status_code=429, detail=f"GROQ_OUT_OF_CREDITS: {exc}")
         raise HTTPException(status_code=502, detail=f"Prompt enhancement failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=enhanced)
 
@@ -347,6 +353,9 @@ def generate_from_world(payload: GenerateFromWorldRequest):
             needs_isolation=category_needs_isolation(payload.category),
         )
     except Exception as exc:
+        error_text = str(exc).lower()
+        if "429" in error_text or "rate_limit" in error_text or "insufficient_quota" in error_text or "quota" in error_text:
+            raise HTTPException(status_code=429, detail=f"GROQ_OUT_OF_CREDITS: {exc}")
         raise HTTPException(status_code=502, detail=f"Prompt generation failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=generated, chroma_color=chroma_color)
 

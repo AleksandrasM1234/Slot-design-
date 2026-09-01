@@ -122,9 +122,20 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "self-contained scene.\n"
             )
 
+        if text_content:
+            style_rules += (
+                f"5. REQUIRED TEXT: The image MUST clearly and legibly render the exact text "
+                f"\"{text_content}\" as a readable design element, spelled correctly, styled to "
+                f"match the art direction. State this requirement in two different phrasings.\n"
+            )
+        else:
+            style_rules += (
+        "       5. NO EMBEDDED TEXT: The image must not contain any text, logos, watermarks, or "
+                "readable characters.\n"
+            )
         style_rules += (
-            "5. NO EMBEDDED TEXT: The image must not contain any text, logos, watermarks, or "
-            "readable characters.\n"
+
+
             "6. PHYSICAL ANALOGIES FOR MOTION: When describing any motion, use physical-world "
             "analogies (e.g. 'pulses like a heartbeat', 'crackles like electricity through wires') "
             "rather than abstract or technical/geometric descriptions.\n"

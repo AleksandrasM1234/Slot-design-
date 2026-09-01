@@ -43,7 +43,7 @@ class AssetSpec:
     reference_image_path: str | None = None
     reference_strength: str = "Mid"
     chroma_color: str = "green"
-    unique_id: str | None = None
+    text_content: str | None = None
 
 @dataclass(frozen=True)
 class Theme:

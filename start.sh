@@ -5,6 +5,14 @@ cd "$(dirname "$0")"
 echo "Starting Slot Asset Generator..."
 echo ""
 
+for PORT in 8000 5173; do
+  PID=$(lsof -ti :$PORT)
+  if [ -n "$PID" ]; then
+    echo "Port $PORT was already in use — stopping old process ($PID)..."
+    kill -9 $PID
+  fi
+done
+
 if [ ! -d "venv" ]; then
   echo "Error: venv not found. Run this once first:"
   echo "  python3 -m venv venv"

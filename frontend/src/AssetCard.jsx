@@ -356,7 +356,7 @@ export default function AssetCard({
       setVideoPath(data.video_path || null);
       setError(data.error);
       if (data.status === "done" && data.result_paths?.[0]) {
-        onAssetDone?.(data.result_paths[0]);
+        onAssetDone?.(data.result_paths[0], asset.category, asset.blueprintKey);
       }
     };
     fetchCurrentStatus();
@@ -369,7 +369,7 @@ export default function AssetCard({
       setVideoPath(data.video_path || null);
       setError(data.error);
       if (data.status === "done" && data.result_paths?.[0]) {
-        onAssetDone?.(data.result_paths[0]);
+        onAssetDone?.(data.result_paths[0], asset.category, asset.blueprintKey);
       }
     };
     return () => ws.close();
@@ -455,6 +455,13 @@ export default function AssetCard({
           placeholder="Base description (your own words)"
           value={asset.description}
           onChange={(e) => updateAsset(index, "description", e.target.value)}
+        />
+
+        <input
+          className="border rounded p-2 w-full mb-2"
+          placeholder="Exact text to render on this asset (leave blank if none — e.g. 'BUY', 'WIN', game title)"
+          value={asset.text_content || ""}
+          onChange={(e) => updateAsset(index, "text_content", e.target.value)}
         />
 
         <div className="flex gap-2 items-start mb-2">
@@ -633,7 +640,13 @@ export default function AssetCard({
         {status && (
           <div className="mb-2">
             <ProgressBar status={status} />
-            {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
+            {error && (
+              <div className="text-red-500 text-sm mt-1">
+                {error.includes("LEONARDO_OUT_OF_CREDITS")
+                  ? "⚠️ Leonardo credits ran out — top up your balance to continue generating."
+                  : error}
+              </div>
+            )}
           </div>
         )}
 
