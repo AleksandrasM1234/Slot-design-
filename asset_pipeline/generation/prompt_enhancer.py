@@ -23,7 +23,7 @@ class PromptEnhancer(ABC):
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
                 master_context: str | None = None, role_constant: str | None = None,
-                has_reference_image: bool = False) -> tuple[str, str]:
+                has_reference_image: bool = False, text_content: str | None = None) -> tuple[str, str]:
         ...
 
     @abstractmethod
@@ -33,7 +33,8 @@ class PromptEnhancer(ABC):
     @abstractmethod
     def generate_from_world(self, role_display_name: str, master_context: str,
                              art_style: str, palette: list[str],
-                             is_animation: bool = False, needs_isolation: bool = True) -> tuple[str, str]:
+                             is_animation: bool = False, needs_isolation: bool = True,
+                             text_content: str | None = None) -> tuple[str, str]:
         ...
 
 
@@ -74,7 +75,7 @@ class GroqPromptEnhancer(PromptEnhancer):
     def enhance(self, base_prompt: str, art_style: str, palette: list[str],
                 is_animation: bool = False, needs_isolation: bool = True,
                 master_context: str | None = None, role_constant: str | None = None,
-                has_reference_image: bool = False) -> tuple[str, str]:
+                has_reference_image: bool = False, text_content: str | None = None) -> tuple[str, str]:
         style_context = ", ".join(palette)
 
         chroma_color = detect_chroma_color(f"{base_prompt} {master_context or ''} {role_constant or ''}")
@@ -130,12 +131,11 @@ class GroqPromptEnhancer(PromptEnhancer):
             )
         else:
             style_rules += (
-        "       5. NO EMBEDDED TEXT: The image must not contain any text, logos, watermarks, or "
+                "5. NO EMBEDDED TEXT: The image must not contain any text, logos, watermarks, or "
                 "readable characters.\n"
             )
+
         style_rules += (
-
-
             "6. PHYSICAL ANALOGIES FOR MOTION: When describing any motion, use physical-world "
             "analogies (e.g. 'pulses like a heartbeat', 'crackles like electricity through wires') "
             "rather than abstract or technical/geometric descriptions.\n"
@@ -171,7 +171,7 @@ class GroqPromptEnhancer(PromptEnhancer):
 
             if has_reference_image:
                 style_rules += (
-                    "13. LOCKED FIRST FRAME: A reference image has been provided as the exact "
+                    "15. LOCKED FIRST FRAME: A reference image has been provided as the exact "
                     "starting frame. State explicitly in the prompt that the animation must begin "
                     "from this exact image with no changes to its shape, proportions, colors, or "
                     "design — describe the motion as happening TO this fixed subject, not as a new "
@@ -217,7 +217,8 @@ class GroqPromptEnhancer(PromptEnhancer):
 
     def generate_from_world(self, role_display_name: str, master_context: str,
                              art_style: str, palette: list[str],
-                             is_animation: bool = False, needs_isolation: bool = True) -> tuple[str, str]:
+                             is_animation: bool = False, needs_isolation: bool = True,
+                             text_content: str | None = None) -> tuple[str, str]:
         style_context = ", ".join(palette)
 
         chroma_color = detect_chroma_color(f"{role_display_name} {master_context}")
@@ -247,8 +248,16 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "object — do not put it on a chroma key.\n"
             )
 
+        if text_content:
+            system_prompt += (
+                f"5. REQUIRED TEXT: must clearly and legibly render the exact text "
+                f"\"{text_content}\" as a readable design element, spelled correctly, stated in "
+                f"two different phrasings.\n"
+            )
+        else:
+            system_prompt += "5. NO EMBEDDED TEXT.\n"
+
         system_prompt += (
-            "5. NO EMBEDDED TEXT.\n"
             "6. PHYSICAL ANALOGIES FOR MOTION where relevant.\n"
             "7. KEEP IT SHORT: roughly 40 words or fewer.\n"
         )
@@ -260,11 +269,6 @@ class GroqPromptEnhancer(PromptEnhancer):
                 "only animating motion and effects around it, never morphing its form.\n"
                 "10. REWARDING ENERGY: if this represents a win or reward, make it vivid and "
                 "entertaining — dynamic motion, sparkle, pulsing light.\n"
-                "11. FLAT 2D, NO DEPTH: flat 2D game sprite, no 3D depth, no parallax, no camera "
-                "movement.\n"
-                "12. NO SHADOWS OR INCIDENTAL MOVEMENT: subject stays physically static — no sway, "
-                "no drifting background elements, no appearing/flickering shadows. Only the specific "
-                "described effect may move; nothing else in the frame.\n"
             )
         else:
             system_prompt += "8. STATIC POSE suited for sprite extraction.\n"
@@ -278,6 +282,10 @@ class GroqPromptEnhancer(PromptEnhancer):
 
         generated_text = self._chat(system_prompt, user_prompt, temperature=0.7)
         return generated_text, chroma_color
+
+
+def category_needs_isolation(category: str) -> bool:
+    return category not in BACKGROUND_CATEGORIES
 
 
 def category_needs_isolation(category: str) -> bool:

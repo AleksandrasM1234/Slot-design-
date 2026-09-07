@@ -78,6 +78,7 @@ class GenerateFromWorldRequest(BaseModel):
     art_style: str
     palette: list[str]
     master_context: str
+    text_content: str | None = None
 
 class ExportZipRequest(BaseModel):
     job_ids: list[str]

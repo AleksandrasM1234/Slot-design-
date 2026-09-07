@@ -40,14 +40,14 @@ from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 from asset_pipeline.orchestration.job_runner import AssetJobRunner
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
 from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
-from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY
+from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY, ALLOWED_ORIGINS
 
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -351,6 +351,7 @@ def generate_from_world(payload: GenerateFromWorldRequest):
             payload.palette,
             is_animation=payload.is_animation,
             needs_isolation=category_needs_isolation(payload.category),
+            text_content=payload.text_content,
         )
     except Exception as exc:
         error_text = str(exc).lower()

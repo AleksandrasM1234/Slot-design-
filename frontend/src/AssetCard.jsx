@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_BASE, WS_BASE } from "./config";
 
 const CATEGORIES = [
   "wild", "scatter", "logo", "low_tier", "high_tier", "symbol",
@@ -15,7 +16,7 @@ const CHECKERBOARD_STYLE = {
 const uploadReferenceImage = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch("http://localhost:8000/uploads/reference-image", {
+  const res = await fetch(`${API_BASE}/uploads/reference-image`, {
     method: "POST",
     body: formData,
   });
@@ -30,7 +31,7 @@ const importAsset = async (name, category, generationType, file) => {
   formData.append("generation_type", generationType);
   formData.append("file", file);
 
-  const res = await fetch("http://localhost:8000/assets/import", {
+  const res = await fetch(`${API_BASE}/assets/import`, {
     method: "POST",
     body: formData,
   });
@@ -38,7 +39,7 @@ const importAsset = async (name, category, generationType, file) => {
 };
 
 const downloadFile = async (path, filename) => {
-  const res = await fetch(`http://localhost:8000/${path}`);
+  const res = await fetch(`${API_BASE}/${path}`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -86,8 +87,8 @@ function ReferencePicker({ onSelect, onClose }) {
   useEffect(() => {
     const fetchAll = async () => {
       const [assetsRes, filesRes] = await Promise.all([
-        fetch("http://localhost:8000/assets"),
-        fetch("http://localhost:8000/api/output-files"),
+        fetch(`${API_BASE}/assets`),
+        fetch(`${API_BASE}/api/output-files`),
       ]);
       const jobs = await assetsRes.json();
       const files = await filesRes.json();
@@ -135,7 +136,7 @@ function ReferencePicker({ onSelect, onClose }) {
                 onClick={() => onSelect(item.path)}
               >
                 <img
-                  src={`http://localhost:8000/${item.path}`}
+                  src={`${API_BASE}/${item.path}`}
                   alt={item.label}
                   className="w-full h-24 object-cover rounded"
                   style={CHECKERBOARD_STYLE}
@@ -228,7 +229,7 @@ function BackgroundRemovalPanel({ jobId, index, onApplied, onClose }) {
 
   const runPreview = async () => {
     setLoading(true);
-    const res = await fetch(`http://localhost:8000/assets/${jobId}/reprocess`, {
+    const res = await fetch(`${API_BASE}/assets/${jobId}/reprocess`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ index, commit: false, ...settings }),
@@ -240,7 +241,7 @@ function BackgroundRemovalPanel({ jobId, index, onApplied, onClose }) {
 
   const applyChanges = async () => {
     setLoading(true);
-    await fetch(`http://localhost:8000/assets/${jobId}/reprocess`, {
+    await fetch(`${API_BASE}/assets/${jobId}/reprocess`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ index, commit: true, ...settings }),
@@ -319,7 +320,7 @@ function BackgroundRemovalPanel({ jobId, index, onApplied, onClose }) {
             <div className="text-sm text-gray-500 mb-1">Preview</div>
             <div className="border rounded p-2 h-64 flex items-center justify-center" style={CHECKERBOARD_STYLE}>
               {previewPath ? (
-                <img src={`http://localhost:8000/${previewPath}`} alt="preview" className="max-h-full max-w-full" />
+                <img src={`${API_BASE}/${previewPath}`} alt="preview" className="max-h-full max-w-full" />
               ) : (
                 <span className="text-gray-400 text-sm">Click Preview to see the result</span>
               )}
@@ -348,7 +349,7 @@ export default function AssetCard({
     if (!asset.jobId) return;
 
     const fetchCurrentStatus = async () => {
-      const res = await fetch(`http://localhost:8000/assets/${asset.jobId}`);
+      const res = await fetch(`${API_BASE}/assets/${asset.jobId}`);
       if (!res.ok) return;
       const data = await res.json();
       setStatus(data.status);
@@ -361,7 +362,7 @@ export default function AssetCard({
     };
     fetchCurrentStatus();
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/assets/${asset.jobId}`);
+    const ws = new WebSocket(`${WS_BASE}/ws/assets/${asset.jobId}`);
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       setStatus(data.status);
@@ -389,7 +390,7 @@ export default function AssetCard({
         {status && status !== "done" && <ProgressBar status={status} />}
         {resultPaths[0] && (
           <img
-            src={`http://localhost:8000/${resultPaths[0]}`}
+            src={`${API_BASE}/${resultPaths[0]}`}
             alt={asset.name}
             className="mt-2 rounded w-full h-20 object-cover"
             style={CHECKERBOARD_STYLE}
@@ -506,7 +507,7 @@ export default function AssetCard({
             {asset.reference_image_path && (
               <div className="flex items-center gap-1">
                 <img
-                  src={`http://localhost:8000/${asset.reference_image_path}`}
+                  src={`${API_BASE}/${asset.reference_image_path}`}
                   alt="reference"
                   className="w-12 h-12 object-cover rounded border"
                 />
@@ -653,7 +654,7 @@ export default function AssetCard({
         {videoPath && (
           <div className="mb-3">
             <div className="text-sm text-gray-500 mb-1">Full animation preview</div>
-            <video src={`http://localhost:8000/${videoPath}`} controls loop autoPlay className="rounded w-full max-h-64" />
+            <video src={`${API_BASE}/${videoPath}`} controls loop autoPlay className="rounded w-full max-h-64" />
             {resultPaths.length > 0 && (
               <button
                 type="button"
@@ -682,7 +683,7 @@ export default function AssetCard({
               return (
                 <div key={path} className="relative group">
                   <img
-                    src={`http://localhost:8000/${path}?t=${asset.jobId}`}
+                    src={`${API_BASE}/${path}?t=${asset.jobId}`}
                     alt={asset.name}
                     className="rounded w-full"
                     style={CHECKERBOARD_STYLE}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AssetCard from "./AssetCard";
 import OutOfCreditsModal from "./OutOfCreditsModal";
+import { API_BASE } from "./config";
 
 const emptyAsset = {
   name: "",
@@ -20,6 +21,7 @@ const emptyAsset = {
   reference_image_path: null,
   reference_strength: "Mid",
   chroma_color: "green",
+  text_content: "",
   uniqueId: null,
 };
 
@@ -119,8 +121,8 @@ export default function App() {
   const refreshBalance = async () => {
     try {
       const [balanceRes, sessionRes] = await Promise.all([
-        fetch("http://localhost:8000/leonardo/balance"),
-        fetch("http://localhost:8000/leonardo/session-cost"),
+        fetch(`${API_BASE}/leonardo/balance`),
+        fetch(`${API_BASE}/leonardo/session-cost`),
       ]);
       if (balanceRes.ok) {
         const data = await balanceRes.json();
@@ -137,33 +139,33 @@ export default function App() {
   };
 
   const handleAssetDone = (path, category, blueprintKey) => {
-  if (AUTO_REFERENCE_CATEGORIES.includes(category) && blueprintKey) {
-    setAssets((prev) =>
-      prev.map((a) =>
-        a.blueprintKey === blueprintKey &&
-        a.generation_type === "animation" &&
-        !a.reference_image_path
-          ? { ...a, reference_image_path: path }
-          : a
-      )
-    );
-  }
-};
+    if (AUTO_REFERENCE_CATEGORIES.includes(category) && blueprintKey) {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.blueprintKey === blueprintKey &&
+          a.generation_type === "animation" &&
+          !a.reference_image_path
+            ? { ...a, reference_image_path: path }
+            : a
+        )
+      );
+    }
+  };
 
   const refreshModelList = async () => {
-    const res = await fetch("http://localhost:8000/models");
+    const res = await fetch(`${API_BASE}/models`);
     const data = await res.json();
     setImageModels(data.image);
     setAnimationModels(data.animation);
   };
 
   const refreshBlueprints = async () => {
-    const res = await fetch("http://localhost:8000/blueprints");
+    const res = await fetch(`${API_BASE}/blueprints`);
     setBlueprints(await res.json());
   };
 
   const refreshFrameworks = async () => {
-    const res = await fetch("http://localhost:8000/frameworks");
+    const res = await fetch(`${API_BASE}/frameworks`);
     setFrameworks(await res.json());
   };
 
@@ -241,7 +243,7 @@ export default function App() {
     if (!newFrameworkName || blueprintKeys.length === 0) return;
 
     const key = newFrameworkName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
-    await fetch("http://localhost:8000/frameworks", {
+    await fetch(`${API_BASE}/frameworks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -275,7 +277,7 @@ export default function App() {
     );
     if (!confirmed) return;
 
-    await fetch(`http://localhost:8000/frameworks/${framework.key}`, {
+    await fetch(`${API_BASE}/frameworks/${framework.key}`, {
       method: "DELETE",
     });
     await refreshFrameworks();
@@ -284,7 +286,7 @@ export default function App() {
   const importFramework = async (file) => {
     const text = await file.text();
     const framework = JSON.parse(text);
-    await fetch("http://localhost:8000/frameworks", {
+    await fetch(`${API_BASE}/frameworks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -312,6 +314,7 @@ export default function App() {
       reference_image_path: a.reference_image_path || null,
       reference_strength: a.reference_strength || "Mid",
       chroma_color: a.chroma_color || "green",
+      text_content: a.text_content || null,
       unique_id: a.uniqueId,
       style_keywords: a.style_keywords.split(",").map((k) => k.trim()).filter(Boolean),
       settings: {
@@ -325,13 +328,13 @@ export default function App() {
   });
 
   const refreshThemeList = async () => {
-    const res = await fetch("http://localhost:8000/themes");
+    const res = await fetch(`${API_BASE}/themes`);
     setSavedThemeNames(await res.json());
   };
 
   const saveTheme = async () => {
     const theme = buildThemePayload();
-    await fetch("http://localhost:8000/themes", {
+    await fetch(`${API_BASE}/themes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ theme }),
@@ -340,7 +343,7 @@ export default function App() {
   };
 
   const loadTheme = async (name) => {
-    const res = await fetch(`http://localhost:8000/themes/${name}`);
+    const res = await fetch(`${API_BASE}/themes/${name}`);
     const theme = await res.json();
     setGameName(theme.name);
     setArtStyle(theme.art_style);
@@ -358,6 +361,7 @@ export default function App() {
         reference_image_path: a.reference_image_path || null,
         reference_strength: a.reference_strength || "Mid",
         chroma_color: a.chroma_color || "green",
+        text_content: a.text_content || "",
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
         model_id: "",
@@ -373,7 +377,7 @@ export default function App() {
 
   const enhancePrompt = async (index) => {
     const asset = assets[index];
-    const res = await fetch("http://localhost:8000/prompts/enhance", {
+    const res = await fetch(`${API_BASE}/prompts/enhance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -385,6 +389,7 @@ export default function App() {
         master_context: masterPromptEnhanced || masterPrompt || null,
         role_constant: asset.role_constant || null,
         has_reference_image: Boolean(asset.reference_image_path),
+        text_content: asset.text_content || null,
       }),
     });
     const data = await res.json();
@@ -399,7 +404,7 @@ export default function App() {
   };
 
   const enhanceMasterPrompt = async () => {
-    const res = await fetch("http://localhost:8000/prompts/enhance-master", {
+    const res = await fetch(`${API_BASE}/prompts/enhance-master`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -440,7 +445,7 @@ export default function App() {
         !asset.description.startsWith("(auto-filled from world)");
 
       if (hasOwnDescription) {
-        const res = await fetch("http://localhost:8000/prompts/enhance", {
+        const res = await fetch(`${API_BASE}/prompts/enhance`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -452,6 +457,7 @@ export default function App() {
             master_context: context,
             role_constant: asset.role_constant || null,
             has_reference_image: Boolean(asset.reference_image_path),
+            text_content: asset.text_content || null,
           }),
         });
         const data = await res.json();
@@ -470,7 +476,7 @@ export default function App() {
           updateAsset(idx, "chroma_color", data.chroma_color);
         }
       } else {
-        const res = await fetch("http://localhost:8000/prompts/generate-from-world", {
+        const res = await fetch(`${API_BASE}/prompts/generate-from-world`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -480,6 +486,7 @@ export default function App() {
             art_style: artStyle,
             palette: palette.split(",").map((p) => p.trim()).filter(Boolean),
             master_context: context,
+            text_content: asset.text_content || null,
           }),
         });
         const data = await res.json();
@@ -508,7 +515,7 @@ export default function App() {
     const assetForm = assets[index];
     const theme = buildThemePayload();
 
-    const res = await fetch("http://localhost:8000/assets", {
+    const res = await fetch(`${API_BASE}/assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -525,7 +532,7 @@ export default function App() {
 
   const pollJobUntilDone = async (jobId) => {
     while (true) {
-      const res = await fetch(`http://localhost:8000/assets/${jobId}`);
+      const res = await fetch(`${API_BASE}/assets/${jobId}`);
       const data = await res.json();
       if (data.status === "done" || data.status === "failed") return data;
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -605,7 +612,7 @@ export default function App() {
     setShowDownloadPicker(false);
     setBatchStatus({ phase: "zipping", done: 0, total: jobIds.length, failed: 0 });
 
-    const res = await fetch("http://localhost:8000/export/zip", {
+    const res = await fetch(`${API_BASE}/export/zip`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ job_ids: jobIds }),

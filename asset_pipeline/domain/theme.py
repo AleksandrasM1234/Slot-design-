@@ -44,6 +44,7 @@ class AssetSpec:
     reference_strength: str = "Mid"
     chroma_color: str = "green"
     text_content: str | None = None
+    unique_id: str | None = None
 
 @dataclass(frozen=True)
 class Theme:
