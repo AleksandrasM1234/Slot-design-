@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AssetCard from "./AssetCard";
 import OutOfCreditsModal from "./OutOfCreditsModal";
-import { API_BASE } from "./config";
+import { API_BASE, DEFAULT_MODEL_ID, pickResolutionForCategory } from "./config";
 
 const emptyAsset = {
   name: "",
@@ -85,6 +85,7 @@ export default function App() {
   const [sessionCost, setSessionCost] = useState(0);
   const [showDownloadPicker, setShowDownloadPicker] = useState(false);
   const [outOfCreditsService, setOutOfCreditsService] = useState(null);
+  const [worldFillStatus, setWorldFillStatus] = useState(null);
 
   useEffect(() => {
     refreshThemeList();
@@ -176,27 +177,33 @@ export default function App() {
   };
 
   const addAssetFromBlueprint = (blueprint, generationType, overrides = {}) => {
-    const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
-    setAssets((prev) => [
-      ...prev,
-      {
-        ...emptyAsset,
-        name: existingCount > 0 ? `${blueprint.key}_${existingCount + 1}` : blueprint.key,
-        category: blueprint.category,
-        generation_type: generationType,
-        role_constant: blueprint.role_constant,
-        blueprintKey: blueprint.key,
-        num_outputs: overrides.num_outputs ?? blueprint.default_num_outputs,
-        duration_seconds: overrides.duration_seconds ?? blueprint.default_duration_seconds ?? 4,
-        reference_image_path: null,
-        model_id: overrides.model_id ?? "",
-        width: overrides.width ?? emptyAsset.width,
-        height: overrides.height ?? emptyAsset.height,
-        uniqueId: makeUniqueId(),
-      },
-    ]);
-    setShowPicker(false);
-  };
+  const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
+
+  const modelList = generationType === "animation" ? animationModels : imageModels;
+  const defaultModelId = overrides.model_id ?? DEFAULT_MODEL_ID[generationType];
+  const modelObj = modelList.find((m) => m.model_id === defaultModelId);
+  const defaultRes = pickResolutionForCategory(modelObj, blueprint.category);
+
+  setAssets((prev) => [
+    ...prev,
+    {
+      ...emptyAsset,
+      name: existingCount > 0 ? `${blueprint.key}_${existingCount + 1}` : blueprint.key,
+      category: blueprint.category,
+      generation_type: generationType,
+      role_constant: blueprint.role_constant,
+      blueprintKey: blueprint.key,
+      num_outputs: overrides.num_outputs ?? blueprint.default_num_outputs,
+      duration_seconds: overrides.duration_seconds ?? blueprint.default_duration_seconds ?? 4,
+      reference_image_path: null,
+      model_id: defaultModelId,
+      width: overrides.width ?? defaultRes?.width ?? emptyAsset.width,
+      height: overrides.height ?? defaultRes?.height ?? emptyAsset.height,
+      uniqueId: makeUniqueId(),
+    },
+  ]);
+  setShowPicker(false);
+};
 
   const loadFramework = (framework) => {
     framework.blueprint_keys.forEach((entry) => {
@@ -431,14 +438,24 @@ export default function App() {
     }
 
     const targetIds = assets.map((a) => a.uniqueId);
+    let completed = 0;
+    let skipped = 0;
+
+    setWorldFillStatus({ done: 0, total: targetIds.length, currentName: "" });
 
     for (const id of targetIds) {
       const currentIndex = assets.findIndex((a) => a.uniqueId === id);
-      if (currentIndex === -1) continue;
+      if (currentIndex === -1) {
+        completed++;
+        setWorldFillStatus({ done: completed, total: targetIds.length, currentName: "" });
+        continue;
+      }
 
       const asset = assets[currentIndex];
       const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
       const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
+
+      setWorldFillStatus({ done: completed, total: targetIds.length, currentName: roleName });
 
       const hasOwnDescription =
         asset.description.trim() !== "" &&
@@ -462,18 +479,21 @@ export default function App() {
         });
         const data = await res.json();
         if (!res.ok) {
-          if (checkForCreditsError(data.detail)) return;
+          if (checkForCreditsError(data.detail)) {
+            setWorldFillStatus(null);
+            return;
+          }
           console.warn(`Enhance failed for "${roleName}"`, data);
-          continue;
-        }
-        if (!data.enhanced_prompt) {
+          skipped++;
+        } else if (!data.enhanced_prompt) {
           console.warn(`Enhance returned empty content for "${roleName}"`, data);
-          continue;
-        }
-        const idx = assets.findIndex((a) => a.uniqueId === id);
-        if (idx !== -1) {
-          updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
-          updateAsset(idx, "chroma_color", data.chroma_color);
+          skipped++;
+        } else {
+          const idx = assets.findIndex((a) => a.uniqueId === id);
+          if (idx !== -1) {
+            updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+            updateAsset(idx, "chroma_color", data.chroma_color);
+          }
         }
       } else {
         const res = await fetch(`${API_BASE}/prompts/generate-from-world`, {
@@ -491,24 +511,31 @@ export default function App() {
         });
         const data = await res.json();
         if (!res.ok) {
-          if (checkForCreditsError(data.detail)) return;
+          if (checkForCreditsError(data.detail)) {
+            setWorldFillStatus(null);
+            return;
+          }
           console.warn(`Generation failed for "${roleName}"`, data);
-          continue;
-        }
-        if (!data.enhanced_prompt) {
+          skipped++;
+        } else if (!data.enhanced_prompt) {
           console.warn(`Generation returned empty content for "${roleName}"`, data);
-          continue;
-        }
-        const idx = assets.findIndex((a) => a.uniqueId === id);
-        if (idx !== -1) {
-          updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
-          updateAsset(idx, "description", `(auto-filled from world) ${roleName}`);
-          updateAsset(idx, "chroma_color", data.chroma_color);
+          skipped++;
+        } else {
+          const idx = assets.findIndex((a) => a.uniqueId === id);
+          if (idx !== -1) {
+            updateAsset(idx, "enhanced_prompt", data.enhanced_prompt);
+            updateAsset(idx, "description", `(auto-filled from world) ${roleName}`);
+            updateAsset(idx, "chroma_color", data.chroma_color);
+          }
         }
       }
+
+      completed++;
+      setWorldFillStatus({ done: completed, total: targetIds.length, currentName: "" });
     }
 
-    alert("Regeneration pass complete. Check the browser console for any blocks that returned empty content.");
+    setWorldFillStatus({ done: completed, total: targetIds.length, currentName: "", finished: true, skipped });
+    setTimeout(() => setWorldFillStatus(null), 4000);
   };
 
   const submitAsset = async (index) => {
@@ -932,6 +959,34 @@ export default function App() {
       {visibleAssets.length === 0 && (
         <div className="text-gray-400 text-sm mt-8 text-center">
           No {activeTab === "image" ? "image" : "animation"} assets yet — click "+ Add block" above.
+        </div>
+      )}
+
+      {worldFillStatus && (
+        <div className="fixed bottom-4 right-4 bg-white border shadow-lg rounded-lg p-4 w-80 z-40">
+          {worldFillStatus.finished ? (
+            <div className="text-sm font-semibold text-green-600">
+              ✓ Done — {worldFillStatus.done}/{worldFillStatus.total} processed
+              {worldFillStatus.skipped > 0 && ` (${worldFillStatus.skipped} skipped, see console)`}
+            </div>
+          ) : (
+            <>
+              <div className="text-sm font-semibold mb-1">
+                Regenerating from world... {worldFillStatus.done}/{worldFillStatus.total}
+              </div>
+              {worldFillStatus.currentName && (
+                <div className="text-xs text-gray-500 mb-2 truncate">
+                  Working on: {worldFillStatus.currentName}
+                </div>
+              )}
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 bg-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${(worldFillStatus.done / worldFillStatus.total) * 100}%` }}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 

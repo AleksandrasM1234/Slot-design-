@@ -41,6 +41,7 @@ from asset_pipeline.orchestration.job_runner import AssetJobRunner
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
 from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
 from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY, ALLOWED_ORIGINS
+from asset_pipeline.config.paths import OUTPUT_DIR, REFERENCE_IMAGES_DIR, ensure_data_dirs
 
 
 app = FastAPI()
@@ -414,6 +415,6 @@ def reprocess_asset(job_id: str, payload: ReprocessRequest):
         processed.save(target_path)
         return {"path": target_path, "committed": True}
 
-    preview_path = f"output/{job_id}_preview_{payload.index}.png"
+    preview_path = f"{OUTPUT_DIR}/{job_id}_preview_{payload.index}.png"
     processed.save(preview_path)
     return {"path": preview_path, "committed": False}

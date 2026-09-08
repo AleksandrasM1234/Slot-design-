@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_BASE, WS_BASE } from "./config";
+import { API_BASE, WS_BASE, DEFAULT_MODEL_ID, pickResolutionForCategory } from "./config";
 
 const CATEGORIES = [
   "wild", "scatter", "logo", "low_tier", "high_tier", "symbol",
@@ -432,8 +432,20 @@ export default function AssetCard({
             className="border rounded p-2"
             value={asset.generation_type}
             onChange={(e) => {
-              updateAsset(index, "generation_type", e.target.value);
-              updateAsset(index, "model_id", "");
+              const newType = e.target.value;
+              updateAsset(index, "generation_type", newType);
+              const modelList = newType === "animation" ? animationModels : imageModels;
+              const defaultModelId = DEFAULT_MODEL_ID[newType];
+              const modelObj = modelList.find((m) => m.model_id === defaultModelId);
+              updateAsset(index, "model_id", defaultModelId);
+              const defaultRes = pickResolutionForCategory(modelObj, asset.category);
+              if (defaultRes) {
+                updateAsset(index, "width", defaultRes.width);
+                updateAsset(index, "height", defaultRes.height);
+              }
+              if (modelObj?.min_duration != null) {
+                updateAsset(index, "duration_seconds", modelObj.min_duration);
+              }
             }}
           >
             <option value="image">image</option>
@@ -551,11 +563,12 @@ export default function AssetCard({
             value={asset.model_id}
             onChange={(e) => {
               updateAsset(index, "model_id", e.target.value);
-              const model = modelOptions.find((m) => m.model_id === e.target.value);
-              if (model) {
-                if (model.resolution_mode === "enumerated" && model.valid_resolutions.length > 0) {
-                  updateAsset(index, "width", model.valid_resolutions[0].width);
-                  updateAsset(index, "height", model.valid_resolutions[0].height);
+                const model = modelOptions.find((m) => m.model_id === e.target.value);
+                if (model) {
+                  const defaultRes = pickResolutionForCategory(model, asset.category);
+                if (defaultRes) {
+                  updateAsset(index, "width", defaultRes.width);
+                  updateAsset(index, "height", defaultRes.height);
                 }
                 if (model.min_duration != null) {
                   updateAsset(index, "duration_seconds", model.min_duration);

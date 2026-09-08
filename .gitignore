@@ -1,5 +1,6 @@
 .env
 custom_frameworks/
 data/
+output/
 venv/
 __pycache__/
