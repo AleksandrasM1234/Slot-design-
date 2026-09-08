@@ -14,14 +14,27 @@ for PORT in 8000 5173; do
 done
 
 if [ ! -d "venv" ]; then
-  echo "Error: venv not found. Run this once first:"
-  echo "  python3 -m venv venv"
-  echo "  source venv/bin/activate"
-  echo "  pip install -r requirements.txt"
-  exit 1
+  echo "First run detected — setting up Python environment..."
+  python3 -m venv venv
+  source venv/bin/activate
+  python3 -m pip install --upgrade pip
+  python3 -m pip install -r requirements.txt
+else
+  source venv/bin/activate
 fi
 
-source venv/bin/activate
+if [ ! -d "frontend/node_modules" ]; then
+  echo "First run detected — installing frontend dependencies..."
+  (cd frontend && npm install)
+fi
+
+if [ ! -f ".env" ]; then
+  echo ""
+  echo "WARNING: No .env file found. Create one with your API keys before generating anything:"
+  echo "  LEONARDO_API_KEY=your_key_here"
+  echo "  GROQ_API_KEY=your_key_here"
+  echo ""
+fi
 
 echo "Starting backend..."
 python3 -m uvicorn asset_pipeline.api.main:app --reload &
