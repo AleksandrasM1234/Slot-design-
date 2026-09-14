@@ -24,3 +24,4 @@ class AssetJob:
     error: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     cost_usd: float | None = None
+    audio_url: str | None = None

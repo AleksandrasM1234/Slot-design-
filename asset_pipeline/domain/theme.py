@@ -20,6 +20,7 @@ class AssetCategory(Enum):
 class GenerationType(Enum):
     IMAGE = "image"
     ANIMATION = "animation"
+    SOUND = "sound"
 
 
 @dataclass(frozen=True)

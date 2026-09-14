@@ -37,6 +37,10 @@ class PromptEnhancer(ABC):
                              text_content: str | None = None) -> tuple[str, str]:
         ...
 
+    @abstractmethod
+    def enhance_sound(self, base_prompt: str, role_constant: str | None = None,
+                   duration: float | None = None) -> str:
+        ...
 
 class GroqPromptEnhancer(PromptEnhancer):
 
@@ -196,6 +200,47 @@ class GroqPromptEnhancer(PromptEnhancer):
 
         enhanced_text = self._chat(style_rules, user_prompt, temperature=0.5)
         return enhanced_text, chroma_color
+
+    def enhance_sound(self, base_prompt: str, role_constant: str | None = None,
+                   duration: float | None = None) -> str:
+        system_prompt = (
+            "You are an expert sound design prompt engineer for a slot game's AI sound effect "
+            "generator. Take the user's raw idea and turn it into a vivid, specific audio "
+            "description.\n\n"
+        )
+
+        if role_constant:
+            system_prompt += f"SOUND IDENTITY (highest priority): {role_constant}\n\n"
+
+        system_prompt += (
+            "MANDATORY CONSTANTS:\n"
+            "1. AUDIO ONLY: Describe only what is HEARD — never mention visuals, colors, or "
+            "imagery. This is a sound generator, not an image generator.\n"
+            "2. CONCRETE SOURCES: Name specific real-world sound sources and materials (e.g. "
+            "'metal coins clinking on glass', 'a sharp digital chime', 'a low bass thud') rather "
+            "than vague mood words like 'exciting' or 'magical' alone.\n"
+            "3. SHORT AND CLEAN: Keep the final description concise, one or two clauses, "
+            "roughly 20 words or fewer — overly long prompts produce muddled, unfocused audio.\n"
+            "4. NO MUSIC UNLESS ASKED: Unless the role explicitly calls for music, this must be "
+            "a short sound effect, not a musical score or melody.\n"
+            "5. NO SPOKEN WORDS: Never include dialogue, voiceover, or spoken words unless "
+            "explicitly part of the role.\n"
+        )
+
+        if duration:
+            system_prompt += (
+                f"6. DURATION AWARENESS: This sound should fit naturally within roughly "
+                f"{duration:.0f} seconds — describe a sound of appropriate length and pacing, "
+                f"not something that needs to be cut off.\n"
+            )
+
+        system_prompt += (
+            "\nReturn ONLY the final sound description, no conversational filler, no quotes."
+        )
+
+        user_prompt = f"Enhance this raw sound idea: {base_prompt}"
+
+        return self._chat(system_prompt, user_prompt, temperature=0.6)
 
     def enhance_master(self, base_prompt: str, art_style: str, palette: list[str]) -> str:
         style_context = ", ".join(palette)

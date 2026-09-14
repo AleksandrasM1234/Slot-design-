@@ -2,7 +2,8 @@ from asyncio import timeout
 import time
 import json
 import os
-from urllib import response
+from urllib import request, response
+from cv2 import data
 import requests
 from asset_pipeline.generation.base import (
     ImageGenerationProvider, GenerationRequest, GenerationResult
@@ -32,6 +33,8 @@ class LeonardoProvider(ImageGenerationProvider):
     def generate(self, request: GenerationRequest) -> GenerationResult:
         if self._model.generation_type == GenerationType.ANIMATION:
             return self._generate_video(request)
+        if self._model.generation_type == GenerationType.SOUND:
+            return self._generate_sound(request)
         return self._generate_image(request)
 
     def _upload_reference_image(self, local_path: str) -> str:
@@ -171,15 +174,27 @@ class LeonardoProvider(ImageGenerationProvider):
         print(f"[DEBUG] Video generation payload: {payload}")
         return self._submit_and_poll(url, payload, timeout=self._video_timeout, expect_video=True)
 
+    def _generate_sound(self, request: GenerationRequest) -> GenerationResult:
+        payload = {
+            "model": self._model.model_id,
+            "public": False,
+            "parameters": {
+                "prompt": request.prompt,
+                "duration": int(request.duration_seconds or 2),
+                "prompt_influence": 0.7,
+                "loop": False,
+                "quantity": request.num_outputs,
+            },
+        }
+        url = f"{self.BASE_URL}/v2/generations"
+        return self._submit_and_poll(url, payload, expect_audio=True)
+
     # -------------------- shared submit/poll --------------------
 
     def _submit_and_poll(self, url: str, payload: dict, timeout: float | None = None,
-                      expect_video: bool = False) -> GenerationResult:
+                      expect_video: bool = False, expect_audio: bool = False) -> GenerationResult:
         response = requests.post(url, json=payload, headers=self._headers)
         if not response.ok:
-            body_lower = response.text.lower()
-            if response.status_code in (402, 403) or "insufficient" in body_lower or "credit" in body_lower:
-                raise RuntimeError(f"LEONARDO_OUT_OF_CREDITS: {response.text}")
             raise RuntimeError(
                 f"Leonardo rejected the generation request with status "
                 f"{response.status_code}: {response.text}"
@@ -201,9 +216,11 @@ class LeonardoProvider(ImageGenerationProvider):
                 f"Could not find a generation id in the response. Raw response: {data}"
             )
 
-        return self._poll(generation_id, timeout or self._timeout, expect_video=expect_video)
+        return self._poll(generation_id, timeout or self._timeout,
+                       expect_video=expect_video, expect_audio=expect_audio)
 
-    def _poll(self, generation_id: str, timeout: float, expect_video: bool = False) -> GenerationResult:
+    def _poll(self, generation_id: str, timeout: float,
+          expect_video: bool = False, expect_audio: bool = False) -> GenerationResult:
         poll_url = f"{self.BASE_URL}/v1/generations/{generation_id}"
 
         elapsed = 0.0
@@ -219,24 +236,30 @@ class LeonardoProvider(ImageGenerationProvider):
             status = generation.get("status")
 
             if status == "COMPLETE":
-                print(f"[DEBUG] Completed generation raw response: {data}")
                 images = generation.get("generated_images") or generation.get("outputs") or []
+            else:
+                images = []
 
                 if expect_video:
+                    urls = tuple(img.get("motionMP4URL") for img in images if img.get("motionMP4URL"))
+                elif expect_audio:
                     urls = tuple(
-                        img.get("motionMP4URL") for img in images if img.get("motionMP4URL")
+                        img.get("audioUrl") or img.get("audio_url") or img.get("url")
+                        for img in images
+                        if img.get("audioUrl") or img.get("audio_url") or img.get("url")
                     )
                 else:
                     urls = tuple(img.get("url") for img in images if img.get("url"))
 
                 if not urls:
                     raise RuntimeError(
-                        f"Generation completed but no {'video' if expect_video else 'image'} "
-                        f"URLs were found. Raw response: {data}"
+                        f"Generation completed but no result URLs were found. Raw response: {data}"
                     )
-                cost = data.get("cost", {}).get("amount") if isinstance(data.get("cost"), dict) else None
-
-                return GenerationResult(asset_urls=urls, provider_name="leonardo", raw_response=data,is_video=expect_video, cost_usd=cost)
+                return GenerationResult(
+                    asset_urls=urls, provider_name="leonardo", raw_response=data,
+                    is_video=expect_video, cost_usd=data.get("cost", {}).get("amount")
+                    if isinstance(data.get("cost"), dict) else None,
+                )
             if status == "FAILED":
                 raise RuntimeError(f"Leonardo generation failed: {data}")
 
@@ -244,9 +267,7 @@ class LeonardoProvider(ImageGenerationProvider):
             elapsed += self._poll_interval
 
         raise TimeoutError(
-            f"Generation {generation_id} timed out after {timeout:.0f}s. "
-            f"Video generations can take several minutes — if this keeps happening, "
-            f"the timeout may need to be increased further."
+            f"Generation {generation_id} timed out after {timeout:.0f}s."
         )
 
     

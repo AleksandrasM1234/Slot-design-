@@ -2,47 +2,49 @@ import os
 import uuid
 import io
 import zipfile
-from PIL import Image
-from asset_pipeline.postprocessing.config import PostProcessingConfig
-from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline, build_reprocess_pipeline
-from asset_pipeline.api.schemas import ReprocessRequest
-from fastapi.responses import StreamingResponse
-from asset_pipeline.generation.model_catalog import models_for_type, find_model
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, UploadFile, File, Form
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import HTTPException
-from asset_pipeline.config.paths import (
-    OUTPUT_DIR, REFERENCE_IMAGES_DIR, ensure_data_dirs
+from fastapi import (
+    FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks,
+    UploadFile, File, Form, HTTPException,
 )
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
+
 from asset_pipeline.api.schemas import (
     CreateAssetRequest, SaveThemeRequest, EnhancePromptRequest,
-    EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest, GenerateFromWorldRequest, ExportZipRequest
+    EnhancePromptResponse, SaveFrameworkRequest, EnhanceMasterPromptRequest,
+    GenerateFromWorldRequest, ExportZipRequest, ReprocessRequest,
+    EnhanceSoundRequest,
 )
-from asset_pipeline.config.exchange_rate import record_observation, get_usd_per_credit
-from asset_pipeline.generation.leonardo_provider import LeonardoProvider
-from asset_pipeline.generation.model_catalog import IMAGE_MODELS
 from asset_pipeline.domain.theme_factory import theme_from_request
 from asset_pipeline.domain.theme_serializer import theme_to_dict
 from asset_pipeline.domain.theme import GenerationType
 from asset_pipeline.domain.job import AssetJob, JobStatus
 from asset_pipeline.domain.asset_blueprint import BLUEPRINT_LIBRARY
 from asset_pipeline.domain.framework_preset import FrameworkPreset, FRAMEWORK_PRESETS
+
 from asset_pipeline.generation.factory import GenerationProviderFactory
 from asset_pipeline.generation.prompt_builder import LeonardoPromptBuilder
 from asset_pipeline.generation.prompt_enhancer import GroqPromptEnhancer, category_needs_isolation
-from asset_pipeline.generation.model_catalog import models_for_type, find_model
+from asset_pipeline.generation.model_catalog import (
+    models_for_type, find_model, IMAGE_MODELS,
+)
+from asset_pipeline.generation.leonardo_provider import LeonardoProvider
+
 from asset_pipeline.postprocessing.config import PostProcessingConfig
-from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline
+from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline, build_reprocess_pipeline
+
 from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
 from asset_pipeline.orchestration.job_repository import JsonFileJobRepository
 from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 from asset_pipeline.orchestration.job_runner import AssetJobRunner
+
 from asset_pipeline.config.theme_repository import JsonFileThemeRepository
 from asset_pipeline.config.framework_repository import JsonFileFrameworkRepository
-from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY, ALLOWED_ORIGINS
 from asset_pipeline.config.paths import OUTPUT_DIR, REFERENCE_IMAGES_DIR, ensure_data_dirs
-
+from asset_pipeline.config.settings import LEONARDO_API_KEY, GROQ_API_KEY, ALLOWED_ORIGINS
+from asset_pipeline.config.exchange_rate import record_observation, get_usd_per_credit
 
 app = FastAPI()
 
@@ -418,3 +420,17 @@ def reprocess_asset(job_id: str, payload: ReprocessRequest):
     preview_path = f"{OUTPUT_DIR}/{job_id}_preview_{payload.index}.png"
     processed.save(preview_path)
     return {"path": preview_path, "committed": False}
+
+@app.post("/prompts/enhance-sound", response_model=EnhancePromptResponse)
+def enhance_sound_prompt(payload: EnhanceSoundRequest):
+    enhancer = GroqPromptEnhancer(api_key=GROQ_API_KEY)
+    try:
+        enhanced = enhancer.enhance_sound(
+            payload.base_prompt, payload.role_constant, payload.duration
+        )
+    except Exception as exc:
+        error_text = str(exc).lower()
+        if "429" in error_text or "rate_limit" in error_text or "quota" in error_text:
+            raise HTTPException(status_code=429, detail=f"GROQ_OUT_OF_CREDITS: {exc}")
+        raise HTTPException(status_code=502, detail=f"Sound prompt enhancement failed: {exc}")
+    return EnhancePromptResponse(enhanced_prompt=enhanced, chroma_color="green")

@@ -20,6 +20,7 @@ class ProductionResult:
     raw_images: list[Image.Image]
     processed_images: list[Image.Image]
     cost_usd: float | None = None
+    audio_url: str | None = None
 
 
 class AssetGenerationPipeline:
@@ -46,14 +47,26 @@ class AssetGenerationPipeline:
 
         notify("postprocessing")
 
+        if asset.settings.generation_type == GenerationType.SOUND:
+            return ProductionResult(
+                video_path=None, raw_images=[], processed_images=[],
+                cost_usd=result.cost_usd, audio_url=result.asset_urls[0],
+            )
+
         if result.is_video:
             video_path, raw_frames = self._download_and_extract_frames(result.asset_urls[0])
             processed = [self._frame_pipeline.run(f) for f in raw_frames]
-            return ProductionResult(video_path=video_path, raw_images=raw_frames, processed_images=processed, cost_usd=result.cost_usd)
+            return ProductionResult(
+                video_path=video_path, raw_images=raw_frames, processed_images=processed,
+                cost_usd=result.cost_usd,
+            )
 
         raw_images = [self._download(url) for url in result.asset_urls]
         processed = [self._frame_pipeline.run(img) for img in raw_images]
-        return ProductionResult(video_path=None, raw_images=raw_images, processed_images=processed, cost_usd=result.cost_usd)
+        return ProductionResult(
+            video_path=None, raw_images=raw_images, processed_images=processed,
+            cost_usd=result.cost_usd,
+        )
 
     @staticmethod
     def _download(url: str) -> Image.Image:

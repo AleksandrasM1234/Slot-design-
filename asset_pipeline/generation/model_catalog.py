@@ -120,9 +120,18 @@ ANIMATION_MODELS = (
     ),
 )
 
+SOUND_MODELS = (
+    ModelOption(
+        "Sound Effects v2", "sound-effects-v2", "leonardo", GenerationType.SOUND,
+        api_version="v2", resolution_mode="none",
+        min_duration=1, max_duration=22,
+        reference_cost_usd=None,  # unverified — check Leonardo's pricing calculator
+        reference_note="Cost not yet confirmed",
+    ),
+)
 
 def all_models() -> tuple[ModelOption, ...]:
-    return IMAGE_MODELS + ANIMATION_MODELS
+    return IMAGE_MODELS + ANIMATION_MODELS + SOUND_MODELS
 
 
 def models_for_type(generation_type: GenerationType) -> tuple[ModelOption, ...]:

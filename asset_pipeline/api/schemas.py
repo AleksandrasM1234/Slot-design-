@@ -95,3 +95,8 @@ class ReprocessRequest(BaseModel):
     ml_model: str = "isnet-general-use"
     upscale_strategy: str = "lanczos"
     scale_factor: int = 4
+
+class EnhanceSoundRequest(BaseModel):
+    base_prompt: str
+    role_constant: str | None = None
+    duration: float | None = None

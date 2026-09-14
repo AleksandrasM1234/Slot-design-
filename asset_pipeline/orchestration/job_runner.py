@@ -1,11 +1,9 @@
 import asyncio
 import os
 import shutil
-import traceback
-from unittest import result
-from asset_pipeline.domain import job
+import requests
 from asset_pipeline.domain.job import AssetJob, JobStatus
-from asset_pipeline.domain.theme import Theme, AssetSpec
+from asset_pipeline.domain.theme import Theme, AssetSpec, GenerationType
 from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
 from asset_pipeline.orchestration.job_repository import JobRepository
 from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
@@ -14,14 +12,12 @@ from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 class AssetJobRunner:
 
     def __init__(self, pipeline: AssetGenerationPipeline,
-             repository: JobRepository, broadcaster: JobEventBroadcaster,
-             output_dir: str = "data/output", credits_checker=None, rate_tracker=None):
+                 repository: JobRepository, broadcaster: JobEventBroadcaster,
+                 output_dir: str = "data/output"):
         self._pipeline = pipeline
         self._repository = repository
         self._broadcaster = broadcaster
         self._output_dir = output_dir
-        self._credits_checker = credits_checker
-        self._rate_tracker = rate_tracker
 
     async def run(self, job: AssetJob, theme: Theme, asset: AssetSpec) -> None:
         loop = asyncio.get_running_loop()
@@ -35,11 +31,21 @@ class AssetJobRunner:
             asyncio.run_coroutine_threadsafe(notify(status_str), loop)
 
         try:
-            credits_before = None
-            if self._credits_checker:
-                credits_before = await asyncio.to_thread(self._credits_checker)
-
             result = await asyncio.to_thread(self._pipeline.produce, theme, asset, on_status)
+
+            if result.audio_url:
+                audio_response = requests.get(result.audio_url)
+                audio_response.raise_for_status()
+                audio_path = f"{self._output_dir}/{job.id}.mp3"
+                with open(audio_path, "wb") as f:
+                    f.write(audio_response.content)
+
+                job.status = JobStatus.DONE
+                job.audio_path = audio_path
+                job.cost_usd = result.cost_usd
+                self._repository.save(job)
+                await self._broadcaster.notify(job)
+                return
 
             raw_paths = []
             processed_paths = []
@@ -63,15 +69,11 @@ class AssetJobRunner:
             job.raw_paths = raw_paths
             job.video_path = video_path
             job.cost_usd = result.cost_usd
-            if self._credits_checker and self._rate_tracker and credits_before is not None and result.cost_usd:
-                credits_after = await asyncio.to_thread(self._credits_checker)
-                credits_used = credits_before - credits_after
-                if credits_used > 0:
-                    self._rate_tracker(result.cost_usd, credits_used)
         except Exception as exc:
             job.status = JobStatus.FAILED
             job.error = str(exc)
             print(f"[job {job.id}] FAILED: {exc}")
+            import traceback
             traceback.print_exc()
         finally:
             self._repository.save(job)

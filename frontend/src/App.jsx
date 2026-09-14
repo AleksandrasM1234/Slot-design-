@@ -40,8 +40,11 @@ function loadPersistedState() {
 
 const makeUniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-const estimateAssetCost = (asset, imageModels, animationModels) => {
-  const modelOptions = asset.generation_type === "animation" ? animationModels : imageModels;
+const estimateAssetCost = (asset, imageModels, animationModels, soundModels) => {
+  const modelOptions =
+    asset.generation_type === "animation" ? animationModels :
+    asset.generation_type === "sound" ? soundModels :
+    imageModels;
   const model = modelOptions.find((m) => m.model_id === asset.model_id);
   if (!model?.reference_cost_usd || !model.reference_width || !model.reference_height) return null;
 
@@ -67,6 +70,7 @@ export default function App() {
   const [selectedThemeName, setSelectedThemeName] = useState(persisted?.selectedThemeName ?? "");
   const [imageModels, setImageModels] = useState([]);
   const [animationModels, setAnimationModels] = useState([]);
+  const [soundModels, setSoundModels] = useState([]);
   const [activeTab, setActiveTab] = useState(persisted?.activeTab ?? "image");
   const [blueprints, setBlueprints] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -158,6 +162,7 @@ export default function App() {
     const data = await res.json();
     setImageModels(data.image);
     setAnimationModels(data.animation);
+    setSoundModels(data.sound || []);
   };
 
   const refreshBlueprints = async () => {
@@ -177,33 +182,36 @@ export default function App() {
   };
 
   const addAssetFromBlueprint = (blueprint, generationType, overrides = {}) => {
-  const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
+    const existingCount = assets.filter((a) => a.blueprintKey === blueprint.key).length;
 
-  const modelList = generationType === "animation" ? animationModels : imageModels;
-  const defaultModelId = overrides.model_id ?? DEFAULT_MODEL_ID[generationType];
-  const modelObj = modelList.find((m) => m.model_id === defaultModelId);
-  const defaultRes = pickResolutionForCategory(modelObj, blueprint.category);
+    const modelList =
+      generationType === "animation" ? animationModels :
+      generationType === "sound" ? soundModels :
+      imageModels;
+    const defaultModelId = overrides.model_id ?? DEFAULT_MODEL_ID[generationType];
+    const modelObj = modelList.find((m) => m.model_id === defaultModelId);
+    const defaultRes = pickResolutionForCategory(modelObj, blueprint.category);
 
-  setAssets((prev) => [
-    ...prev,
-    {
-      ...emptyAsset,
-      name: existingCount > 0 ? `${blueprint.key}_${existingCount + 1}` : blueprint.key,
-      category: blueprint.category,
-      generation_type: generationType,
-      role_constant: blueprint.role_constant,
-      blueprintKey: blueprint.key,
-      num_outputs: overrides.num_outputs ?? blueprint.default_num_outputs,
-      duration_seconds: overrides.duration_seconds ?? blueprint.default_duration_seconds ?? 4,
-      reference_image_path: null,
-      model_id: defaultModelId,
-      width: overrides.width ?? defaultRes?.width ?? emptyAsset.width,
-      height: overrides.height ?? defaultRes?.height ?? emptyAsset.height,
-      uniqueId: makeUniqueId(),
-    },
-  ]);
-  setShowPicker(false);
-};
+    setAssets((prev) => [
+      ...prev,
+      {
+        ...emptyAsset,
+        name: existingCount > 0 ? `${blueprint.key}_${existingCount + 1}` : blueprint.key,
+        category: blueprint.category,
+        generation_type: generationType,
+        role_constant: blueprint.role_constant,
+        blueprintKey: blueprint.key,
+        num_outputs: overrides.num_outputs ?? blueprint.default_num_outputs,
+        duration_seconds: overrides.duration_seconds ?? blueprint.default_duration_seconds ?? 4,
+        reference_image_path: null,
+        model_id: defaultModelId,
+        width: overrides.width ?? defaultRes?.width ?? emptyAsset.width,
+        height: overrides.height ?? defaultRes?.height ?? emptyAsset.height,
+        uniqueId: makeUniqueId(),
+      },
+    ]);
+    setShowPicker(false);
+  };
 
   const loadFramework = (framework) => {
     framework.blueprint_keys.forEach((entry) => {
@@ -328,7 +336,7 @@ export default function App() {
         generation_type: a.generation_type,
         width: Number(a.width),
         height: Number(a.height),
-        duration_seconds: a.generation_type === "animation" ? Number(a.duration_seconds) : null,
+        duration_seconds: (a.generation_type === "animation" || a.generation_type === "sound") ? Number(a.duration_seconds) : null,
         num_outputs: Number(a.num_outputs),
       },
     })),
@@ -383,8 +391,30 @@ export default function App() {
   };
 
   const enhancePrompt = async (index) => {
-    const asset = assets[index];
-    const res = await fetch(`${API_BASE}/prompts/enhance`, {
+  const asset = assets[index];
+
+  if (asset.generation_type === "sound") {
+    const res = await fetch(`${API_BASE}/prompts/enhance-sound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_prompt: asset.description,
+        role_constant: asset.role_constant || null,
+        duration: Number(asset.duration_seconds) || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (!checkForCreditsError(data.detail)) {
+        alert(`Enhance failed: ${data.detail || "unknown error"}`);
+      }
+      return;
+    }
+    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
+    return;
+  }
+
+  const res = await fetch(`${API_BASE}/prompts/enhance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -452,6 +482,13 @@ export default function App() {
       }
 
       const asset = assets[currentIndex];
+
+      if (asset.generation_type === "sound") {
+        completed++;
+        setWorldFillStatus({ done: completed, total: targetIds.length, currentName: "" });
+        continue;
+      }
+
       const blueprint = blueprints.find((b) => b.key === asset.blueprintKey);
       const roleName = blueprint ? blueprint.display_name : asset.name || asset.category;
 
@@ -579,7 +616,7 @@ export default function App() {
     let totalEstimate = 0;
     let missingEstimateCount = 0;
     readyAssets.forEach(({ asset }) => {
-      const cost = estimateAssetCost(asset, imageModels, animationModels);
+      const cost = estimateAssetCost(asset, imageModels, animationModels, soundModels);
       if (cost == null) {
         missingEstimateCount++;
       } else {
@@ -628,6 +665,7 @@ export default function App() {
     let scoped = assets;
     if (scope === "image") scoped = assets.filter((a) => a.generation_type === "image");
     if (scope === "animation") scoped = assets.filter((a) => a.generation_type === "animation");
+    if (scope === "sound") scoped = assets.filter((a) => a.generation_type === "sound");
 
     const jobIds = scoped.map((a) => a.jobId).filter(Boolean);
 
@@ -747,6 +785,14 @@ export default function App() {
         >
           Animations ({assets.filter((a) => a.generation_type === "animation").length})
         </button>
+        <button
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "sound" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
+          }`}
+          onClick={() => setActiveTab("sound")}
+        >
+          Sounds ({assets.filter((a) => a.generation_type === "sound").length})
+        </button>
       </div>
 
       <div className="mb-4 flex gap-2 flex-wrap items-center">
@@ -826,6 +872,12 @@ export default function App() {
                       <button className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
                         onClick={() => addAssetFromBlueprint(b, "animation")}>
                         + Animation
+                      </button>
+                    )}
+                    {b.available_types.includes("sound") && (
+                      <button className="border rounded px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200"
+                        onClick={() => addAssetFromBlueprint(b, "sound")}>
+                        + Sound
                       </button>
                     )}
                   </div>
@@ -932,6 +984,10 @@ export default function App() {
                 All animations
               </button>
               <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
+                onClick={() => downloadZip("sound")}>
+                All sounds
+              </button>
+              <button className="border rounded p-2 bg-gray-100 hover:bg-gray-200"
                 onClick={() => downloadZip("all")}>
                 Everything
               </button>
@@ -951,6 +1007,7 @@ export default function App() {
             submitAsset={submitAsset}
             imageModels={imageModels}
             animationModels={animationModels}
+            soundModels={soundModels}
             onAssetDone={handleAssetDone}
           />
         ))}
@@ -958,7 +1015,7 @@ export default function App() {
 
       {visibleAssets.length === 0 && (
         <div className="text-gray-400 text-sm mt-8 text-center">
-          No {activeTab === "image" ? "image" : "animation"} assets yet — click "+ Add block" above.
+          No {activeTab} assets yet — click "+ Add block" above.
         </div>
       )}
 
