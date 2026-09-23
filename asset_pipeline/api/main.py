@@ -194,6 +194,7 @@ def list_models():
     return {
         "image": [_serialize_model(m) for m in models_for_type(GenerationType.IMAGE)],
         "animation": [_serialize_model(m) for m in models_for_type(GenerationType.ANIMATION)],
+        "sound": [_serialize_model(m) for m in models_for_type(GenerationType.SOUND)],
     }
 
 
@@ -434,3 +435,15 @@ def enhance_sound_prompt(payload: EnhanceSoundRequest):
             raise HTTPException(status_code=429, detail=f"GROQ_OUT_OF_CREDITS: {exc}")
         raise HTTPException(status_code=502, detail=f"Sound prompt enhancement failed: {exc}")
     return EnhancePromptResponse(enhanced_prompt=enhanced, chroma_color="green")
+
+FRONTEND_DIST = "frontend_dist"
+
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/static", StaticFiles(directory=f"{FRONTEND_DIST}/assets"), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
