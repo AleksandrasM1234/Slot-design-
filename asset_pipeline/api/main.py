@@ -439,7 +439,13 @@ def enhance_sound_prompt(payload: EnhanceSoundRequest):
 FRONTEND_DIST = "frontend_dist"
 
 if os.path.isdir(FRONTEND_DIST):
-    app.mount("/static", StaticFiles(directory=f"{FRONTEND_DIST}/assets"), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
