@@ -374,6 +374,7 @@ def get_asset(job_id: str):
         "status": job.status.value,
         "result_paths": job.result_paths,
         "video_path": job.video_path,
+        "audio_path": job.audio_path,
         "error": job.error,
     }
 

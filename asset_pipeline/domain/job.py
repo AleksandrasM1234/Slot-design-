@@ -21,6 +21,7 @@ class AssetJob:
     result_paths: list[str] = field(default_factory=list)
     raw_paths: list[str] = field(default_factory=list)
     video_path: str | None = None
+    audio_path: str | None = None
     error: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     cost_usd: float | None = None

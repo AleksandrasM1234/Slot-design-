@@ -237,8 +237,6 @@ class LeonardoProvider(ImageGenerationProvider):
 
             if status == "COMPLETE":
                 images = generation.get("generated_images") or generation.get("outputs") or []
-            else:
-                images = []
 
                 if expect_video:
                     urls = tuple(img.get("motionMP4URL") for img in images if img.get("motionMP4URL"))
@@ -260,6 +258,7 @@ class LeonardoProvider(ImageGenerationProvider):
                     is_video=expect_video, cost_usd=data.get("cost", {}).get("amount")
                     if isinstance(data.get("cost"), dict) else None,
                 )
+
             if status == "FAILED":
                 raise RuntimeError(f"Leonardo generation failed: {data}")
 
@@ -269,5 +268,3 @@ class LeonardoProvider(ImageGenerationProvider):
         raise TimeoutError(
             f"Generation {generation_id} timed out after {timeout:.0f}s."
         )
-
-    

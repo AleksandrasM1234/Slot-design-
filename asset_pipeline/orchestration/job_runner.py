@@ -12,12 +12,15 @@ from asset_pipeline.orchestration.job_broadcaster import JobEventBroadcaster
 class AssetJobRunner:
 
     def __init__(self, pipeline: AssetGenerationPipeline,
-                 repository: JobRepository, broadcaster: JobEventBroadcaster,
-                 output_dir: str = "data/output"):
+             repository: JobRepository, broadcaster: JobEventBroadcaster,
+             output_dir: str = "data/output",
+             credits_checker=None, rate_tracker=None):
         self._pipeline = pipeline
         self._repository = repository
         self._broadcaster = broadcaster
         self._output_dir = output_dir
+        self._credits_checker = credits_checker
+        self._rate_tracker = rate_tracker
 
     async def run(self, job: AssetJob, theme: Theme, asset: AssetSpec) -> None:
         loop = asyncio.get_running_loop()

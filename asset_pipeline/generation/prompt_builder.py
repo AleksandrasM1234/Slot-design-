@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from asset_pipeline.domain import theme
-from asset_pipeline.domain.theme import Theme, AssetSpec
+from asset_pipeline.domain.theme import Theme, AssetSpec, GenerationType
 from asset_pipeline.generation.base import GenerationRequest
 
 
@@ -14,21 +14,26 @@ class PromptBuilder(ABC):
 class LeonardoPromptBuilder(PromptBuilder):
 
     def build(self, theme: Theme, asset: AssetSpec) -> GenerationRequest:
-        base = asset.enhanced_prompt if asset.enhanced_prompt else self._assemble_prompt(theme, asset)
-        prompt = f"{asset.role_constant} {base}" if asset.role_constant else base
-        negative = "blurry, watermark, text, extra limbs, cropped"
+        if asset.settings.generation_type == GenerationType.SOUND:
+            base = asset.enhanced_prompt if asset.enhanced_prompt else asset.description
+            prompt = f"{asset.role_constant} {base}" if asset.role_constant else base
+            negative = None
+        else:
+            base = asset.enhanced_prompt if asset.enhanced_prompt else self._assemble_prompt(theme, asset)
+            prompt = f"{asset.role_constant} {base}" if asset.role_constant else base
+            negative = "blurry, watermark, text, extra limbs, cropped"
 
         return GenerationRequest(
-            prompt=prompt,
-            generation_type=asset.settings.generation_type,
-            negative_prompt=negative,
-            width=asset.settings.width,
-            height=asset.settings.height,
-            duration_seconds=asset.settings.duration_seconds,
-            num_outputs=asset.settings.num_outputs,
-            reference_image_path=asset.reference_image_path,
-            reference_strength=asset.reference_strength,
-        )
+        prompt=prompt,
+        generation_type=asset.settings.generation_type,
+        negative_prompt=negative,
+        width=asset.settings.width,
+        height=asset.settings.height,
+        duration_seconds=asset.settings.duration_seconds,
+        num_outputs=asset.settings.num_outputs,
+        reference_image_path=asset.reference_image_path,
+        reference_strength=asset.reference_strength,
+    )
 
     @staticmethod
     def _assemble_prompt(theme: Theme, asset: AssetSpec) -> str:
