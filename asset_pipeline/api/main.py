@@ -33,6 +33,7 @@ from asset_pipeline.generation.model_catalog import (
 from asset_pipeline.generation.leonardo_provider import LeonardoProvider
 
 from asset_pipeline.postprocessing.config import PostProcessingConfig
+from asset_pipeline.config.seed_data import seed_defaults
 from asset_pipeline.postprocessing.frame_pipeline import build_frame_pipeline, build_reprocess_pipeline
 
 from asset_pipeline.orchestration.asset_pipeline import AssetGenerationPipeline
@@ -57,6 +58,7 @@ app.add_middleware(
 )
 
 ensure_data_dirs()
+seed_defaults()
 app.mount("/data/output", StaticFiles(directory=OUTPUT_DIR), name="output")
 app.mount("/data/reference_images", StaticFiles(directory=REFERENCE_IMAGES_DIR), name="reference_images")
 

@@ -1,0 +1,1133 @@
+{
+  "name": "Nocturne Reaper",
+  "art_style": "gothic dark fantasy illustration, heavy shadows, sharp rim-light, engraved metal textures",
+  "palette": [
+    "obsidian black",
+    "blood red",
+    "bone white"
+  ],
+  "master_prompt": "A cursed cathedral city where death itself walks the streets at midnight, collecting debts owed by the living in exchange for forbidden power",
+  "master_prompt_enhanced": "In the crumbling spires of the cathedral city, midnight summons Death, a cloaked figure who roams the cobblestone streets in search of the living\u2019s unpaid debts, offering forbidden power in exchange. The air is thick with the scent of iron and incense, and the stone arches are etched with runes that glow faintly in bone white. Shadows cling to every alley, while the occasional burst of blood red light from shattered stained glass paints the scene with an ominous, almost seductive glow. The city\u2019s residents live in perpetual dread, knowing that each night could bring a bargain that costs more than they can afford.",
+  "assets": [
+    {
+      "name": "background_intro_landscape",
+      "category": "background",
+      "description": "(auto-filled from world) Intro background (landscape)",
+      "style_keywords": [],
+      "enhanced_prompt": "Crumbling cathedral spires under a blood\u2011red moon, stone arches etched with bone\u2011white runes, heavy shadows pooling in cobblestone alleys, faint rim\u2011light highlighting cracked stained glass, obsidian sky streaked with iron\u2011scented mist, gothic dark fantasy illustration, engraved metal textures, dramatic chiaroscuro, ominous glow, static scene, no text, no chroma key",
+      "role_constant": "This asset must always be a full 16:9 landscape-orientation background scene used for the game's intro screen.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "background_intro_portrait",
+      "category": "background",
+      "description": "(auto-filled from world) Intro background (portrait)",
+      "style_keywords": [],
+      "enhanced_prompt": "Crumbling cathedral spire at midnight, stone arches etched with glowing bone\u2011white runes, obsidian cobblestones slick with iron\u2011red stains, a lone cloaked Death figure standing beneath a shattered stained\u2011glass window, rim\u2011lit by blood\u2011red light, heavy shadows casting across the scene, gothic dark fantasy illustration, engraved metal textures, sharp rim\u2011light, static pose, full scene background, no chroma key, no text.",
+      "role_constant": "This asset must always be a full 9:16 portrait-orientation background scene used for the game's intro screen.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "background_game_landscape",
+      "category": "background",
+      "description": "(auto-filled from world) Game background (landscape)",
+      "style_keywords": [],
+      "enhanced_prompt": "Crumbling cathedral spires loom over rain\u2011slick cobblestones, bone\u2011white runes glowing faintly on obsidian stone, blood\u2011red shards of stained glass flicker like dying candles, sharp rim\u2011light from moonless sky casting deep shadows across the forsaken alleyways, a chilling, oppressive atmosphere.",
+      "role_constant": "This asset must always be a full 16:9 landscape-orientation background scene used behind the main game reels.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "background_game_portrait",
+      "category": "background",
+      "description": "(auto-filled from world) Game background (portrait)",
+      "style_keywords": [],
+      "enhanced_prompt": "Crumbling cathedral spire at midnight, stone arches etched with glowing bone\u2011white runes, obsidian cobblestones slick with iron\u2011tinged rain, shadows clutching alleys, a burst of blood\u2011red light from shattered stained glass, rim\u2011lit gothic darkness, heavy shadows, engraved metal textures.",
+      "role_constant": "This asset must always be a full 9:16 portrait-orientation background scene used behind the main game reels.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "button_confirm",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a green 'confirm/yes' UI button graphic, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "button_cancel",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Cancel button (red)",
+      "style_keywords": [],
+      "enhanced_prompt": "A crimson \u201cCancel\u201d button shaped like a broken, blood\u2011red sigil, engraved with obsidian black runes and a bone\u2011white rim, floating in space with no contact shadows, no light spill or particles beyond its edges, soft top\u2011down studio lighting, chroma key green background, isolated on a solid chroma key green background, no light spill, no glow outside the subject, resembling a flickering candle flame in motion.",
+      "role_constant": "This asset must always be a red 'cancel/no' UI button graphic, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "buy_button",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Buy feature button",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian black button with blood red glyph, bone white rim, engraved metal texture, gothic dark fantasy illustration, top\u2011down studio lighting, floating in space, isolated on a solid chroma key green background, no contact shadows, no light spill beyond edges, no light spill outside subject, no embedded text, static pose.",
+      "role_constant": "This asset must always be a 'Buy Feature' UI button graphic, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "buy_button_text",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Buy feature button text overlay",
+      "style_keywords": [],
+      "enhanced_prompt": "A crimson\u2011rimmed, obsidian\u2011black button with bone\u2011white engraved text \u201cBuy Feature,\u201d floating in space, no contact shadows, no light spill, no glow beyond edges, soft, even top\u2011down studio lighting, gothic dark fantasy illustration, sharp rim\u2011light, engraved metal texture, isolated on a flat, solid, vibrant chroma key green background, isolated on a flat, solid, vivid green backdrop.",
+      "role_constant": "This asset must always be the text/label overlay reading 'BUY' for a feature-purchase button.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "feature_scene_landscape",
+      "category": "background",
+      "description": "(auto-filled from world) Feature scene (landscape)",
+      "style_keywords": [],
+      "enhanced_prompt": "crumbling cathedral spires under midnight sky, cobblestone streets slick with iron mist, bone-white rune arches glowing faintly, blood-red stained glass shards casting ominous glows, heavy shadows cling to alleys, rim-lit gargoyles, engraved bronze gates, obsidian black clouds, ominous silence, gothic dark fantasy illustration, sharp rim-light, engraved metal textures, blood red, bone white, obsidian black, static pose for sprite extraction",
+      "role_constant": "This asset must always be a full 16:9 landscape scene shown during a bonus feature.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "feature_scene_portrait",
+      "category": "background",
+      "description": "(auto-filled from world) Feature scene (portrait)",
+      "style_keywords": [],
+      "enhanced_prompt": "Midnight cathedral spires, cracked stone arches etched with bone\u2011white runes, heavy shadows pooling on cobblestones, a cloaked Death figure draped in obsidian cloth, rim\u2011lit by blood\u2011red stained glass, iron scent swirling, ominous glow, dark fantasy illustration, engraved metal textures, sharp contrast, atmospheric depth, static pose, full scene portrait, no chroma key, no embedded text.",
+      "role_constant": "This asset must always be a full 9:16 portrait scene shown during a bonus feature.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_coin",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win coin (generic)",
+      "style_keywords": [],
+      "enhanced_prompt": "Hold & Win coin, a small, obsidian-black disc with a blood-red rune, bone-white rim, engraved metal texture; floating in space, no contact shadows, no light spill beyond edges, no glow or particles extending beyond the coin, soft, even top-down studio lighting, gothic dark fantasy illustration, static pose, isolated on a solid chroma key green background, isolated on a vibrant green backdrop, no embedded text, physical analogies for motion implied, 40 words total.",
+      "role_constant": "This asset must always be a generic themed coin/token used inside the Hold & Win feature grid, with no tier text.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_coin",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win coin (generic)",
+      "style_keywords": [],
+      "enhanced_prompt": "Hold & Win coin, gothic dark fantasy illustration, obsidian black metal with bone white engraved rune, blood red rim-light accent, floating in space, isolated on a solid vibrant chroma key green background, no contact shadows, no light spill beyond edges, soft even top-down studio lighting, static pose, no embedded text",
+      "role_constant": "This asset must always be a generic themed coin/token used inside the Hold & Win feature grid, with no tier text.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_door_left",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win door (left)",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian black, gothic door with sharp rim-light, engraved metal textures, blood red hinges, bone white runes, floating in space, no contact shadows, zero glow or particles beyond edges, no light spill, soft even top-down studio lighting, static pose, isolated on vibrant chroma key green background, isolated on bright chroma key green background.",
+      "role_constant": "This asset must always be the left-hand door/panel graphic used to frame the Hold & Win feature.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_door_right",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win door (right)",
+      "style_keywords": [],
+      "enhanced_prompt": "Hold & Win door (right), a gothic dark fantasy illustration of a heavy, engraved metal door in obsidian black with bone white runes and blood red accents, rim-lit, sharp shadows, floating in space, isolated on a solid chroma key green background, no contact shadows, no light spill beyond edges, soft even top-down studio lighting, static pose suitable for sprite extraction.",
+      "role_constant": "This asset must always be the right-hand door/panel graphic used to frame the Hold & Win feature.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_logo_text",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win logo/text",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian black engraved metal logo, blood red lettering, bone white rim-light; gothic dark fantasy illustration, sharp shadows, no contact shadows, floating in space, no light spill, zero glow beyond edges, consistent soft top-down studio lighting, isolated on vibrant chroma key green background, no embedded text, static pose for sprite extraction.",
+      "role_constant": "This asset must always be a stylized logo or text graphic reading 'HOLD & WIN', matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "logo_intro",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Intro logo",
+      "style_keywords": [],
+      "enhanced_prompt": "Gothic dark fantasy illustration of the cathedral city\u2019s intro logo, a stylized obsidian spire with blood\u2011red accents and bone\u2011white runes, rim\u2011lit, engraved metal texture, floating in space, no contact shadows, no light spill, soft even top\u2011down studio lighting, no embedded text, static pose for sprite extraction, isolated on a flat vibrant chroma key green background, isolated on a flat bright green chroma key background.",
+      "role_constant": "This asset must always be the game's logo treatment specifically for the intro/splash screen.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "logo_frame",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Logo frame",
+      "style_keywords": [],
+      "enhanced_prompt": "A gothic, obsidian-black wrought\u2011iron frame with sharp, engraved rune patterns, blood\u2011red accents, and bone\u2011white rim lighting; floating in space with no contact shadows; no light spill or particles beyond edges, zero glow outside the subject; soft, even top\u2011down studio lighting, static pose for sprite extraction.",
+      "role_constant": "This asset must always be the game's logo treatment \u2014 the game's name/title rendered as a stylized logo graphic. Never a symbol or scene.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "modal_desktop",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Modal / popup background (desktop)",
+      "style_keywords": [],
+      "enhanced_prompt": "Gothic dark fantasy illustration of a crumbling cathedral spire backdrop, obsidian black stone arches etched with bone white runes, blood red stained glass shards, sharp rim-light, engraved metal textures, soft top-down studio lighting, no contact shadows, floating in space, no light spill, isolated on a solid chroma key green background, no embedded text, static pose for sprite extraction.",
+      "role_constant": "This asset must always be a full desktop-orientation modal/popup background panel, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "modal_portrait",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Modal / popup background (portrait)",
+      "style_keywords": [],
+      "enhanced_prompt": "Isolated on a flat, solid chroma key green background, floating in space, no contact shadows, no light spill beyond edges, soft even top-down studio lighting, gothic dark fantasy illustration, obsidian black, blood red, bone white, sharp rim-light, engraved metal textures, static portrait pose, no embedded text, physical analogies for motion, no light spill, chroma key background, no contact shadows, no light spill, consistent lighting, static pose.",
+      "role_constant": "This asset must always be a full portrait-orientation modal/popup background panel, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "reel_mask_landscape",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Reel mask (landscape)",
+      "style_keywords": [],
+      "enhanced_prompt": "A floating, oblique silhouette of a cracked obsidian shield etched with bone-white runes, a faint blood\u2011red glow at its edges, rim\u2011lit by soft top\u2011down studio light, isolated on a vibrant chroma\u2011key green backdrop, no contact shadows, no light spill, no embedded text, static pose, suitable for sprite extraction.",
+      "role_constant": "This asset must always be a landscape-orientation reel mask/frame overlay for the game's reel area.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "reel_mask_portrait",
+      "category": "ui_element",
+      "description": "(auto-filled from world) Reel mask (portrait)",
+      "style_keywords": [],
+      "enhanced_prompt": "Death cloaked figure",
+      "role_constant": "This asset must always be a portrait-orientation reel mask/frame overlay for the game's reel area.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "sticky_cell",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Sticky cell background",
+      "style_keywords": [],
+      "enhanced_prompt": "obsidian black cracked stone wall, engraved rune patterns glowing bone white, blood red accents, gothic dark fantasy illustration, heavy shadows, sharp rim-light, top-down studio lighting, no contact shadows floating in space, no light spill or particles beyond edges, isolated on solid chroma key green background, chroma key green background, isolated on a flat vibrant green background, no embedded text, static pose for sprite extraction, physical analogies for motion: none.",
+      "role_constant": "This asset must always be the background graphic for a 'sticky' reel cell, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "sticky_cell_mask",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Sticky cell mask",
+      "style_keywords": [],
+      "enhanced_prompt": "A gothic dark fantasy illustration of a sticky cell mask: obsidian black mask with blood red veins, bone white rune engravings; sharp rim-light accentuates engraved metal textures. The mask floats in space, no contact shadows, no light spill beyond edges, soft even top-down studio lighting, chroma key green background, isolated on a solid vibrant chroma key green background, no embedded text.",
+      "role_constant": "This asset must always be a mask/overlay graphic for a 'sticky' reel cell, matching the game's theme.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_j",
+      "category": "low_tier",
+      "description": "(auto-filled from world) J (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "Gothic dark fantasy illustration of a low-tier card J, engraved metal texture with obsidian black borders, bone white rune accents, subtle blood red highlights, top-down soft studio lighting, floating in space, no contact shadows, no light spill beyond edges, no glow or particles extending past the card, no embedded text, static pose, chroma key green background, isolated on vibrant green backdrop, isolated on bright green backdrop",
+      "role_constant": "This asset must always depict the letter J playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_j",
+      "category": "low_tier",
+      "description": "(auto-filled from world) J (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "A low\u2011tier card J, gothic illustration of a cracked obsidian sigil with blood\u2011red veins, bone\u2011white runes etched, rim\u2011lit by sharp top\u2011down studio light; floating in space against a chroma key green background, no shadows, no light spill, no glow beyond edges, looping, static camera, subtle pulsing energy, vibrant sparkles, no embedded text, identity preserved, 40 words or fewer.",
+      "role_constant": "This asset must always depict the letter J playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_q",
+      "category": "low_tier",
+      "description": "(auto-filled from world) Q (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "A low-tier card titled \u201cQ\u201d rendered in gothic dark fantasy illustration, obsidian black background with bone white runes and blood red accents, floating in space with no contact shadows, no light spill beyond edges, soft top-down studio lighting, sharp rim-light, engraved metal textures, isolated on a solid vibrant chroma key green background, isolated on a solid bright green background.",
+      "role_constant": "This asset must always depict the letter Q playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_q",
+      "category": "low_tier",
+      "description": "(auto-filled from world) Q (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "A low-tier card, gothic dark fantasy illustration, obsidian black background, blood red veins, bone white rune edges, engraved metal texture, soft even top-down studio lighting, floating in space, no contact shadows, no light spill, no glow or particles beyond edges, no embedded text, subtle pulsing light, slight rotation, seamless loop, static camera, recognisable card shape, rewarding energy with faint sparkle, no morphing.",
+      "role_constant": "This asset must always depict the letter Q playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_k",
+      "category": "low_tier",
+      "description": "(auto-filled from world) K (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "oblivion card, gothic illustration, obsidian black background, blood red accents, bone white runes, engraved metal texture, soft top-down studio lighting, no contact shadows, no light spill, chroma key green background, floating in space, static pose",
+      "role_constant": "This asset must always depict the letter K playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_k",
+      "category": "low_tier",
+      "description": "(auto-filled from world) K (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "A low-tier card, gothic dark fantasy illustration, obsidian black frame with bone white runic edges, blood red glow accents, engraved metal texture, floating in space on a solid chroma key green background, no contact shadows, no light spill, soft even top-down studio lighting, subtle pulsing light and faint sparkle around the rim, static camera, seamless loop, maintains card identity, no embedded text, motion like a flickering candle flame.",
+      "role_constant": "This asset must always depict the letter K playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_a",
+      "category": "low_tier",
+      "description": "(auto-filled from world) A (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "A low-tier card, gothic dark fantasy illustration, obsidian black surface with blood red accents and bone white rune edges, sharp rim-light, engraved metal texture, floating in space, isolated on a vibrant chroma key green background, separated against a bright green chroma key backdrop, no contact shadows, no glow or particles beyond its edges, zero light spill outside its borders, soft top-down studio lighting.",
+      "role_constant": "This asset must always depict the letter A playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "card_a",
+      "category": "low_tier",
+      "description": "(auto-filled from world) A (low-tier card)",
+      "style_keywords": [],
+      "enhanced_prompt": "Gothic dark fantasy illustration of a low-tier card, obsidian black backing, blood red inked border, bone white rune symbols etched, floating in space against a solid chroma key green background, no contact shadows, no light spill beyond edges, soft even top-down studio lighting, subtle pulsing glow around edges, static camera, seamless loop.",
+      "role_constant": "This asset must always depict the letter A playing-card symbol, styled as a low-tier slot symbol. Never any other letter or character.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "Cloaked Death symbol: an obsidian skull with bone-white rune veins, blood-red eyes, engraved metal halo, floating in space on a solid vibrant chroma key green background, no contact shadows, no light spill, soft top-down studio lighting, gothic dark fantasy illustration, static pose for sprite extraction.",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "A stylized skull\u2011crossbones emblem, bone\u2011white engraved on obsidian black metal, blood\u2011red veins pulsing; floating in space on a flat, solid chroma\u2011key green background, isolated against a bright green backdrop; no contact shadows, no glow beyond edges, soft top\u2011down studio lighting, subtle metallic ripple motion, seamless loop, static camera, no embedded text, vivid reward sparkle, gothic dark fantasy illustration, sharp rim light, engraved textures.",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "A blood\u2011red chalice with bone\u2011white runes, obsidian rim, floating above a solid chroma\u2011key green backdrop; no contact shadows, no light spill or particles beyond edges, soft top\u2011down studio lighting, subtle pulsing glow, looping motion of dripping crimson, still identity intact.",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "A skeletal hand clutching a blood\u2011red coin, engraved in obsidian black with bone\u2011white runes; isolated on a solid chroma\u2011key green background, floating in space, no contact shadows, no light spill, consistent top\u2011down studio lighting, no embedded text, static pose, like a frozen wind gust, 40 words total.",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "Gothic chalice of bone white, obsidian rim, blood\u2011red accents, engraved with runes; floating in space, no contact shadows, no light spill beyond edges, no glow particles; soft top\u2011down studio lighting, static camera, seamless loop, vivid pulsing sparks, chroma key green background, chroma key green backdrop.",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian chalice with a blood\u2011red gem, bone\u2011white runes etched in engraved metal, gothic dark fantasy illustration, heavy shadows, sharp rim\u2011light, floating in space, isolated on a solid chroma key green background, isolated on a vibrant green key, no contact shadows, no light spill, no glow extending beyond edges, no particles beyond the subject, soft even top-down studio lighting, static pose for sprite extraction",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "special_symbol",
+      "category": "high_tier",
+      "description": "(auto-filled from world) Special themed symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "obsidian skull icon with bone-white rune edges, blood-red veins pulsing, floating, no shadows, no light spill, top-down studio lighting, gothic illustration, engraved metal texture, chroma key green background, isolated, no contact shadows, no glow beyond edges, pulsing, seamless loop, static camera",
+      "role_constant": "This asset must always be a close-up portrait \u2014 a face, head, or bust \u2014 of a character or being defined by the game's theme. Not a full body, not an object, not a scene: a face. It is never a wild or scatter.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "wild",
+      "category": "wild",
+      "description": "(auto-filled from world) Wild symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "A skeletal hand clutching a cracked coin, obsidian black bone-white runes etched around its fingers, blood red veins pulsing; isolated on a flat, solid chroma key green backdrop, floating in space, no contact shadows; zero glow or particle spill beyond edges, no light spill; soft, even, top\u2011down studio lighting, gothic dark fantasy illustration, sharp rim-light, engraved metal textures.",
+      "role_constant": "This asset must always be the Wild symbol \u2014 a single bold emblem or icon (not a face, not a full character) representing the theme's most powerful or forbidden force, clearly distinct from all other symbols. Never a scatter or standard symbol.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "wild",
+      "category": "wild",
+      "description": "(auto-filled from world) Wild symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "A skeletal hand clutching a crimson coin, veins pulsing like blood-red runes, floating in space, no contact shadows, no light spill beyond edges, no glow leaking, soft top-down studio lighting, gothic dark fantasy illustration, obsidian black, blood red, bone white, sparkling pulse, seamless loop, static camera, identity preserved, vivid reward energy, chroma key green background, isolated on a solid vibrant green backdrop.",
+      "role_constant": "This asset must always be the Wild symbol \u2014 a single bold emblem or icon (not a face, not a full character) representing the theme's most powerful or forbidden force, clearly distinct from all other symbols. Never a scatter or standard symbol.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "scatter",
+      "category": "scatter",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be the Scatter symbol \u2014 a single bold emblem, artifact, or talisman tied to the theme (not a face, not a character), clearly distinct from all other symbols. Never a wild or standard symbol.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "scatter",
+      "category": "scatter",
+      "description": "(auto-filled from world) Scatter symbol",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian skull icon with bone-white rune filigree, blood-red veins pulsing, floating in space, no contact shadows, no light spill beyond edges, soft top-down studio lighting, gothic dark fantasy illustration, sharp rim-light, engraved metal texture, chroma key green background, isolated on vibrant green, no glow outside, seamless loop, static camera, recognizably skull, no embedded text, reward energy sparkles, pulse, 40 words or fewer.",
+      "role_constant": "This asset must always be the Scatter symbol \u2014 a single bold emblem, artifact, or talisman tied to the theme (not a face, not a character), clearly distinct from all other symbols. Never a wild or standard symbol.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_major",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win \u2014 Major coin",
+      "style_keywords": [],
+      "enhanced_prompt": "Majestic coin, obelisk\u2011shaped, obsidian black with bone\u2011white rune engravings, blood\u2011red veins pulsing; floating in space, no contact shadows, no light spill beyond edges, soft even top\u2011down studio lighting, gothic dark fantasy illustration, sharp rim\u2011light, 4K, chroma key green background, isolated on vibrant green, no glow or particles extending, static pose for sprite extraction.",
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MAJOR' for a Hold & Win feature. Never Mini or Mega.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_major",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win \u2014 Major coin",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian coin with bone-white rune engraving, blood-red glow veins, floating in space, no contact shadows, no light spill beyond edges, soft top-down studio lighting, gothic dark fantasy illustration, sharp rim-light, vibrant chroma key green background, seamless loop, pulsing sparkle",
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MAJOR' for a Hold & Win feature. Never Mini or Mega.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_mega",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win \u2014 Mega coin",
+      "style_keywords": [],
+      "enhanced_prompt": "Obsidian-black, blood\u2011red coin with bone\u2011white rune engravings, floating in space, no contact shadows, no light spill beyond edges, zero glow or particles beyond subject, soft even top-down studio lighting, gothic dark fantasy illustration, sharp rim-light, engraved metal texture, isolated on a solid chroma\u2011key green background, isolated against a bright green backdrop.",
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MEGA' for a Hold & Win feature. Never Mini or Major.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_mega",
+      "category": "hold_and_win",
+      "description": "(auto-filled from world) Hold & Win \u2014 Mega coin",
+      "style_keywords": [],
+      "enhanced_prompt": "A gleaming obsidian coin with blood\u2011red rune engravings, pulsing bone\u2011white light, floating in a chroma key green background; no contact shadows, no light spill beyond edges, soft top\u2011down studio lighting, static camera, seamless loop, with subtle spinning motion and sparkling particle bursts around it, maintaining its coin shape.",
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MEGA' for a Hold & Win feature. Never Mini or Major.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_mini",
+      "category": "hold_and_win",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MINI' for a Hold & Win feature. Never Mega or Major.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "image",
+        "width": 1024,
+        "height": 1024,
+        "duration_seconds": null,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "hw_mini",
+      "category": "hold_and_win",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a coin/token labeled or themed as 'MINI' for a Hold & Win feature. Never Mega or Major.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "big_win",
+      "category": "animation",
+      "description": "(auto-filled from world) Big Win animation",
+      "style_keywords": [],
+      "enhanced_prompt": "A cloaked Death figure holding a gleaming obsidian coin, sparks of blood red swirling, bone white runes pulse, no contact shadows, floating, no light spill, top-down studio lighting, chroma key green background, seamless loop, static camera, rewarding energy",
+      "role_constant": "This asset must always be a 'BIG WIN' celebratory text/graphic animation. Never Mega or Ultra tier wording.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "mega_win",
+      "category": "animation",
+      "description": "(auto-filled from world) Mega Win animation",
+      "style_keywords": [],
+      "enhanced_prompt": "A skeletal Death figure in a tattered black cloak, hands outstretched, surrounded by pulsing blood\u2011red glyphs and bone\u2011white sparks; motion mimics a slow, rhythmic heartbeat, with engraved metal armaments flashing; floating in space, no contact shadows; zero glow or particles beyond edges, no light spill; isolated on a flat, solid chroma\u2011key green background, on a flat, solid chroma\u2011key green background; soft, even top\u2011down studio lighting; seamless loop, static camera; vivid, entertaining reward energy.",
+      "role_constant": "This asset must always be a 'MEGA WIN' celebratory text/graphic animation. Never Big or Ultra tier wording.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "ultra_win",
+      "category": "animation",
+      "description": "(auto-filled from world) Ultra Win animation",
+      "style_keywords": [],
+      "enhanced_prompt": "Death's cloak swirling, obsidian black, blood red sigils pulsing, bone white glow, metallic engraved edges, floating in space, no shadows, no light spill, soft top-down lighting, chroma key green background, seamless loop, static camera, vivid sparkling, rewarding energy",
+      "role_constant": "This asset must always be an 'ULTRA WIN' celebratory text/graphic animation. Never Big or Mega tier wording.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "suspense_reel",
+      "category": "animation",
+      "description": "(auto-filled from world) Reel suspense animation",
+      "style_keywords": [],
+      "enhanced_prompt": "A lone, obsidian\u2011black cloaked Death figure stands upright, his hooded silhouette sharp against bone white rune\u2011etched runes; blood\u2011red eyes glint. He floats in space, no contact shadows, top\u2011down studio lighting, no light spill or particles beyond edges, no embedded text. He wields a slender, engraved silver scythe that vibrates with a subtle, pulsing, crystal\u2011like energy, looping seamlessly. The animation shows the scythe's blade flashing faint red sparks, while faint bone\u2011white runes around him glow rhythmically, maintaining the same form. The scene loops seamlessly with a static camera, no light spill, no contact shadows, consistent top\u2011down lighting, chroma key green background.",
+      "role_constant": "This asset must always be a looping suspense/anticipation animation for a spinning reel awaiting its result.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_highlight",
+      "category": "animation",
+      "description": "(auto-filled from world) Win highlight animation",
+      "style_keywords": [],
+      "enhanced_prompt": "Death's cloaked silhouette, bone-white runes pulsing, blood-red",
+      "role_constant": "This asset must always be a short looping highlight/glow animation used to indicate a winning symbol or line.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "animation",
+        "width": 960,
+        "height": 960,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "wild_sound",
+      "category": "wild",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a distinct, impactful sound for the Wild symbol landing \u2014 more dramatic than a regular symbol land. Never music.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "expanding_symbol",
+      "category": "symbol",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a stretching/growing mechanical or magical sound effect for a symbol expanding to fill a reel. Never music.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "reel_spin",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a continuous mechanical/whirring reel-spinning sound suitable for looping. Never music, never a one-shot hit sound.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "reel_stop",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a short mechanical thud/click of a single reel stopping.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 1.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "scatter_stop",
+      "category": "scatter",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a short sound for a reel stopping specifically on a Scatter symbol. Distinct from a generic reel stop. Never music.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 1.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "scatter_stop",
+      "category": "scatter",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a short sound for a reel stopping specifically on a Scatter symbol. Distinct from a generic reel stop. Never music.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 1.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "scatter_suspense",
+      "category": "scatter",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a tense, anticipatory sound specifically tied to a Scatter symbol nearly landing or about to trigger a feature. Distinct from generic reel suspense. Never resolved/triumphant.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "feature_transition",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a sweeping transition sound marking entry into a bonus feature.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_1",
+      "category": "ui_element",
+      "description": "a single low bell toll with a soft metallic shimmer",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a small, modest win celebration sound \u2014 the lowest tier win.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 1.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_2",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a win celebration sound, more exciting than tier 1.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_3",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a win celebration sound, more exciting than tier 2.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_4",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a win celebration sound, more exciting than tier 3, approaching the biggest tier.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_5_all",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be the complete biggest win celebration sound as one continuous piece, from start to finish.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 8.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_5_start",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be the opening/triggering sound that begins the biggest win celebration, before it loops.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 2.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_5_loop",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be the biggest, most triumphant win celebration sound, composed to loop seamlessly.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    },
+    {
+      "name": "win_sound_5_end",
+      "category": "ui_element",
+      "description": "",
+      "style_keywords": [],
+      "enhanced_prompt": null,
+      "role_constant": "This asset must always be a triumphant resolving/ending sound that concludes the biggest win celebration.",
+      "reference_image_path": null,
+      "settings": {
+        "generation_type": "sound",
+        "width": 768,
+        "height": 768,
+        "duration_seconds": 3.0,
+        "num_outputs": 1
+      }
+    }
+  ]
+}

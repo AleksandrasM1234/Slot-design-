@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import AssetCard from "./AssetCard";
 import OutOfCreditsModal from "./OutOfCreditsModal";
-import { API_BASE, DEFAULT_MODEL_ID, pickResolutionForCategory } from "./config";
+import BulkModelModal from "./BulkModelModal";
+import {
+  API_BASE, DEFAULT_MODEL_ID, pickResolutionForCategory, fitResolutionToModel,
+} from "./config";
 
 const emptyAsset = {
   name: "",
@@ -90,6 +93,7 @@ export default function App() {
   const [showDownloadPicker, setShowDownloadPicker] = useState(false);
   const [outOfCreditsService, setOutOfCreditsService] = useState(null);
   const [worldFillStatus, setWorldFillStatus] = useState(null);
+  const [showBulkModels, setShowBulkModels] = useState(false);
 
   useEffect(() => {
     refreshThemeList();
@@ -179,6 +183,40 @@ export default function App() {
     setAssets((prev) =>
       prev.map((a, i) => (i === index ? { ...a, [field]: value } : a))
     );
+  };
+
+  const applyModelsToAll = ({ image, animation, sound, onlyEmpty }) => {
+    const chosen = { image, animation, sound };
+    const lists = { image: imageModels, animation: animationModels, sound: soundModels };
+
+    setAssets((prev) =>
+      prev.map((a) => {
+        const modelId = chosen[a.generation_type];
+        if (!modelId) return a;
+        if (onlyEmpty && a.model_id) return a;
+
+        const model = lists[a.generation_type].find((m) => m.model_id === modelId);
+        if (!model) return a;
+
+        const size = fitResolutionToModel(model, a.category, Number(a.width), Number(a.height));
+
+        let duration = a.duration_seconds;
+        if (model.min_duration != null) {
+          const low = model.min_duration;
+          const high = model.max_duration ?? Infinity;
+          duration = Math.min(Math.max(Number(duration) || low, low), high);
+        }
+
+        return {
+          ...a,
+          model_id: modelId,
+          width: size.width,
+          height: size.height,
+          duration_seconds: duration,
+        };
+      })
+    );
+    setShowBulkModels(false);
   };
 
   const addAssetFromBlueprint = (blueprint, generationType, overrides = {}) => {
@@ -336,7 +374,10 @@ export default function App() {
         generation_type: a.generation_type,
         width: Number(a.width),
         height: Number(a.height),
-        duration_seconds: (a.generation_type === "animation" || a.generation_type === "sound") ? Number(a.duration_seconds) : null,
+        duration_seconds:
+          a.generation_type === "animation" || a.generation_type === "sound"
+            ? Number(a.duration_seconds)
+            : null,
         num_outputs: Number(a.num_outputs),
       },
     })),
@@ -379,7 +420,7 @@ export default function App() {
         text_content: a.text_content || "",
         style_keywords: a.style_keywords.join(", "),
         generation_type: a.settings.generation_type,
-        model_id: "",
+        model_id: DEFAULT_MODEL_ID[a.settings.generation_type] ?? "",
         width: a.settings.width,
         height: a.settings.height,
         duration_seconds: a.settings.duration_seconds ?? 4,
@@ -391,30 +432,30 @@ export default function App() {
   };
 
   const enhancePrompt = async (index) => {
-  const asset = assets[index];
+    const asset = assets[index];
 
-  if (asset.generation_type === "sound") {
-    const res = await fetch(`${API_BASE}/prompts/enhance-sound`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        base_prompt: asset.description,
-        role_constant: asset.role_constant || null,
-        duration: Number(asset.duration_seconds) || null,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      if (!checkForCreditsError(data.detail)) {
-        alert(`Enhance failed: ${data.detail || "unknown error"}`);
+    if (asset.generation_type === "sound") {
+      const soundRes = await fetch(`${API_BASE}/prompts/enhance-sound`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          base_prompt: asset.description,
+          role_constant: asset.role_constant || null,
+          duration: Number(asset.duration_seconds) || null,
+        }),
+      });
+      const soundData = await soundRes.json();
+      if (!soundRes.ok) {
+        if (!checkForCreditsError(soundData.detail)) {
+          alert(`Enhance failed: ${soundData.detail || "unknown error"}`);
+        }
+        return;
       }
+      updateAsset(index, "enhanced_prompt", soundData.enhanced_prompt);
       return;
     }
-    updateAsset(index, "enhanced_prompt", data.enhanced_prompt);
-    return;
-  }
 
-  const res = await fetch(`${API_BASE}/prompts/enhance`, {
+    const res = await fetch(`${API_BASE}/prompts/enhance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -609,7 +650,7 @@ export default function App() {
       .filter(({ asset }) => asset.model_id);
 
     if (readyAssets.length === 0) {
-      alert("No assets have a model selected yet — open each card and pick a model first.");
+      alert("No assets have a model selected yet — use \"Set models for all\" or open each card and pick a model first.");
       return;
     }
 
@@ -814,6 +855,13 @@ export default function App() {
             }} />
         </label>
         <button
+          className="border rounded p-2 bg-gray-200 disabled:opacity-50"
+          onClick={() => setShowBulkModels(true)}
+          disabled={assets.length === 0}
+        >
+          Set models for all
+        </button>
+        <button
           className="border rounded p-2 bg-green-600 text-white disabled:opacity-50"
           onClick={generateAll}
           disabled={batchStatus !== null || assets.length === 0}
@@ -1017,6 +1065,19 @@ export default function App() {
         <div className="text-gray-400 text-sm mt-8 text-center">
           No {activeTab} assets yet — click "+ Add block" above.
         </div>
+      )}
+
+      {showBulkModels && (
+        <BulkModelModal
+          modelsByType={{ image: imageModels, animation: animationModels, sound: soundModels }}
+          countsByType={{
+            image: assets.filter((a) => a.generation_type === "image").length,
+            animation: assets.filter((a) => a.generation_type === "animation").length,
+            sound: assets.filter((a) => a.generation_type === "sound").length,
+          }}
+          onApply={applyModelsToAll}
+          onClose={() => setShowBulkModels(false)}
+        />
       )}
 
       {worldFillStatus && (

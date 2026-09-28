@@ -16,6 +16,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY asset_pipeline/ ./asset_pipeline/
+COPY seed_data/ ./seed_data/
 COPY --from=frontend-build /app/frontend/dist ./frontend_dist
 
 RUN mkdir -p data/output data/reference_images data/jobs data/themes data/custom_frameworks
